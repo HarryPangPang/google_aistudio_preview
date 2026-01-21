@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 import path from 'path';
 import fs from 'fs-extra';
 import { PROJECT_ROOT } from '../config/constants.js';
@@ -10,15 +11,19 @@ fs.ensureDirSync(dbDir);
 
 let dbInstance = null;
 
-export const getDb = () => {
+export const getDb = async () => {
     if (dbInstance) return dbInstance;
 
-    dbInstance = new Database(dbPath);
+    dbInstance = await open({
+        filename: dbPath,
+        driver: sqlite3.Database
+    });
+
     // Enable WAL mode for better concurrency
-    dbInstance.pragma('journal_mode = WAL');
+    await dbInstance.run('PRAGMA journal_mode = WAL');
 
     // Init tables
-    dbInstance.exec(`
+    await dbInstance.exec(`
         CREATE TABLE IF NOT EXISTS deployments (
             id TEXT PRIMARY KEY,
             app_id TEXT, -- Optional linkage

@@ -2,17 +2,18 @@ import { getDb } from '../db/index.js';
 
 export const DeploymentModel = {
     async create(id, files, appId = null) {
-        const db = getDb();
+        const db = await getDb();
         const now = Date.now();
-        const stmt = db.prepare(`INSERT INTO deployments (id, app_id, files, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`);
-        stmt.run(id, appId, JSON.stringify(files), 'pending', now, now);
+        await db.run(
+            `INSERT INTO deployments (id, app_id, files, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+            id, appId, JSON.stringify(files), 'pending', now, now
+        );
         return { id, status: 'pending' };
     },
 
     async get(id) {
-        const db = getDb();
-        const stmt = db.prepare(`SELECT * FROM deployments WHERE id = ?`);
-        const row = stmt.get(id);
+        const db = await getDb();
+        const row = await db.get(`SELECT * FROM deployments WHERE id = ?`, id);
         if (!row) return null;
         return {
             ...row,
@@ -22,13 +23,12 @@ export const DeploymentModel = {
 
     // Get basic info without heavy files blob
     async getStatus(id) {
-        const db = getDb();
-        const stmt = db.prepare(`SELECT id, status, url, error, created_at, updated_at FROM deployments WHERE id = ?`);
-        return stmt.get(id);
+        const db = await getDb();
+        return await db.get(`SELECT id, status, url, error, created_at, updated_at FROM deployments WHERE id = ?`, id);
     },
 
     async updateStatus(id, status, updates = {}) {
-        const db = getDb();
+        const db = await getDb();
         const now = Date.now();
         const setClause = [];
         const params = [];
@@ -50,15 +50,13 @@ export const DeploymentModel = {
 
         params.push(id); // For WHERE clause
 
-        const stmt = db.prepare(`UPDATE deployments SET ${setClause.join(', ')} WHERE id = ?`);
-        stmt.run(...params);
+        await db.run(`UPDATE deployments SET ${setClause.join(', ')} WHERE id = ?`, ...params);
     },
 
     async getPendingTask() {
-        const db = getDb();
+        const db = await getDb();
         // Simple queue: get oldest pending task
-        const stmt = db.prepare(`SELECT * FROM deployments WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1`);
-        const row = stmt.get();
+        const row = await db.get(`SELECT * FROM deployments WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1`);
         if (!row) return null;
         return {
             ...row,

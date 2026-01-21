@@ -112,23 +112,23 @@ export default defineConfig({
         }
     },
     async getGeneratedCode() {
-        const db = getDb();
+        const db = await getDb();
     
         // Check if any task is currently processing
-        const processing = db.prepare('SELECT id FROM generated_codes WHERE is_processed = 2').get();
+        const processing = await db.get('SELECT id FROM generated_codes WHERE is_processed = 2');
         if (processing) {
             console.log('[BuildService] A task is already processing, skipping.');
             return;
         }
     
         // Get oldest unprocessed task
-        const task = db.prepare('SELECT * FROM generated_codes WHERE is_processed = 0 ORDER BY date_time ASC LIMIT 1').get();
+        const task = await db.get('SELECT * FROM generated_codes WHERE is_processed = 0 ORDER BY date_time ASC LIMIT 1');
         if (!task) return;
     
         console.log(`[BuildService] Processing generated code task: ${task.id}`);
     
         // Mark as processing
-        db.prepare('UPDATE generated_codes SET is_processed = 2 WHERE id = ?').run(task.id);
+        await db.run('UPDATE generated_codes SET is_processed = 2 WHERE id = ?', task.id);
     
         try {
             const { id, file_name, target_path } = task;
@@ -210,11 +210,11 @@ export default defineConfig({
             }
     
             // Mark as processed
-            db.prepare('UPDATE generated_codes SET is_processed = 1 WHERE id = ?').run(id);
+            await db.run('UPDATE generated_codes SET is_processed = 1 WHERE id = ?', id);
             
             // Update DeploymentModel
             // Check if deployment exists
-            const existingDeploy = DeploymentModel.get(id);
+            const existingDeploy = await DeploymentModel.get(id);
             if (!existingDeploy) {
                 await DeploymentModel.create(id, {}, null);
             }
@@ -223,11 +223,11 @@ export default defineConfig({
         } catch (err) {
             console.error(`[BuildService] Error processing task ${task.id}:`, err);
             // Mark as processed (failed) to avoid infinite loop
-            db.prepare('UPDATE generated_codes SET is_processed = 1 WHERE id = ?').run(task.id);
+            await db.run('UPDATE generated_codes SET is_processed = 1 WHERE id = ?', task.id);
             
             // Update DeploymentModel to error
             try {
-                const existingDeploy = DeploymentModel.get(task.id);
+                const existingDeploy = await DeploymentModel.get(task.id);
                 if (!existingDeploy) {
                     await DeploymentModel.create(task.id, {}, null);
                 }
@@ -236,4 +236,3 @@ export default defineConfig({
         }
     }
 };
-

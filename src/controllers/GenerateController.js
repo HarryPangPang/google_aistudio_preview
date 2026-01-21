@@ -65,13 +65,12 @@ export const GenerateController = {
             const { fileName, targetPath, id, code } = data;
             console.log('[GenerateController] buildCode: ', data);
             const isProcessed = 0; //1: processed, 0: not processed 2: processing
-            const db = getDb();
-            const stmt = db.prepare(`
+            const db = await getDb();
+            
+            await db.run(`
                 INSERT OR REPLACE INTO generated_codes (id, file_name, target_path, code, is_processed, date_time)
                 VALUES (?, ?, ?, ?, ?, ?)
-            `);
-            
-            stmt.run(id, fileName, targetPath, code, isProcessed, Date.now());
+            `, id, fileName, targetPath, code, isProcessed, Date.now());
 
             ctx.body = 'ok'
         } catch (err) {
