@@ -1,0 +1,11 @@
+{
+  "watch": ["src", "server.js"],
+  "ext": "js,json",
+  "ignore": [
+    ".tmp/",
+    "database/",
+    "node_modules/",
+    "playground-dist/"
+  ],
+  "exec": "node"
+}
