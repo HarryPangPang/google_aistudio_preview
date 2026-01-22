@@ -17,6 +17,7 @@ router.get('/api/apps', AppController.get);
 // Generate Routes
 router.post('/api/generate', GenerateController.generate);
 router.get('/api/chatcontent', GenerateController.chatcontent);
+router.post('/api/initChatContent', GenerateController.initChatContent);
 router.post('/api/chatmsg', GenerateController.chatmsg);
 router.post('/api/download', GenerateController.downloadcode);
 router.post('/api/deploywithcode', GenerateController.deploywithcode);

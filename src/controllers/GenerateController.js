@@ -37,6 +37,16 @@ export const GenerateController = {
             ctx.body = { error: 'Failed to communicate with AI service: ' + err.message };
         }
     },
+    async initChatContent(ctx) {
+        const { prompt } = ctx.request.body;
+        if (!prompt) {
+            ctx.status = 400;
+            ctx.body = { error: 'prompt is required' };
+            return;
+        }
+        const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
+        ctx.body = response.data;
+    },
     async chatmsg(ctx) {
         const { prompt } = ctx.request.body;
         if (!prompt) {
@@ -56,6 +66,7 @@ export const GenerateController = {
     },
     async deploywithcode(ctx) {
         const { data } = ctx.request.body;
+        console.log('[GenerateController] deploywithcode: ', data);
         const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/deploywithcode`, { data });
         ctx.body = response.data;
     },
