@@ -7,3 +7,4 @@ dist
 .demo
 .tmp
 database
+package-lock.json

@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getDb } from '../db/index.js';
 
-// Assuming GoogleStudio service runs on port 8080
-const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:8080';
+// Assuming GoogleStudio service runs on port 1234
+const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:1234';
 
 export const GenerateController = {
     async generate(ctx) {
