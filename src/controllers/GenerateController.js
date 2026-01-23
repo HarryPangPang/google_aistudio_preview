@@ -45,17 +45,18 @@ export const GenerateController = {
             return;
         }
         const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
+        // 帮我改一下这里：key 是driveid，value是chatDomContent,存入数据库,表名是chat_record
         ctx.body = response.data;
     },
     async chatmsg(ctx) {
-        const { prompt } = ctx.request.body;
+        const {driveid, prompt} = ctx.request.body;
         if (!prompt) {
             ctx.status = 400;
             ctx.body = { error: 'prompt is required' };
             return;
         }
         console.log('[GenerateController] prompt: ', prompt);
-        const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/chatmsg`, { prompt });
+        const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/chatmsg`, { driveid, prompt });
         console.log('[GenerateController] response: ', response.data);
         ctx.body = response.data;
     },
