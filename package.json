@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@koa/cors": "^5.0.0",
+    "adm-zip": "^0.5.16",
     "axios": "^1.6.0",
     "fs-extra": "^11.2.0",
     "koa": "^2.15.0",

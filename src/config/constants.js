@@ -8,4 +8,4 @@ const __dirname = path.dirname(__filename);
 export const PROJECT_ROOT = path.resolve(__dirname, '../../');
 export const TMP_DIR = path.join(PROJECT_ROOT, '.tmp');
 export const PLAYGROUND_DIST_DIR = path.join(PROJECT_ROOT, 'playground-dist');
-export const PORT = 1234;
+export const PORT = 80;

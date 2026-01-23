@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
+import AdmZip from 'adm-zip';
 import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
 import { DeploymentModel } from '../models/DeploymentModel.js';
 import { getDb } from '../db/index.js';
@@ -158,18 +159,10 @@ export default defineConfig({
             const tmpZipPath = path.join(deployDir, file_name);
             await fs.copy(sourcePath, tmpZipPath);
     
-            // Unzip
+            // Unzip (cross-platform)
             await fs.ensureDir(sourceDir);
-            await new Promise((resolve, reject) => {
-                exec(`unzip -o "${tmpZipPath}" -d "${sourceDir}"`, (err, stdout, stderr) => {
-                    if (err) {
-                        // Try tar if unzip fails? Or just reject.
-                        reject(new Error(`Unzip failed: ${stderr || err.message}`));
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+            const zip = new AdmZip(tmpZipPath);
+            zip.extractAllTo(sourceDir, true);
     
             // Delete tmp zip
             await fs.remove(tmpZipPath);
