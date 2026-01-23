@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs-extra';
 import send from 'koa-send';
-import { DeploymentModel } from '../models/DeploymentModel.js';
 import { TMP_DIR, PLAYGROUND_DIST_DIR } from '../config/constants.js';
 import { getLoadingHtml, getErrorHtml } from '../tools/templates.js';
+import { getDb } from '../db/index.js';
 
 export const PreviewController = {
     /**
@@ -51,33 +51,17 @@ export const PreviewController = {
 
         let cleanPath = subPath.startsWith('/') ? subPath.slice(1) : subPath;
         if (cleanPath === '') cleanPath = 'index.html';
-
-        const state = DeploymentModel.get(id);
-
-        // 1. Not Found
+        const db = await getDb();
+        const state = await db.get('SELECT * FROM build_record WHERE id = ?', id);
+        console.log('state', state);
         if (!state) {
             ctx.status = 404;
             ctx.body = 'Deployment not found';
             return;
         }
-
-        // 2. Pending/Building -> Show Loading
-        if (state.status === 'pending' || state.status === 'building') {
-            if (cleanPath === 'index.html') {
-                ctx.type = 'html';
-                ctx.body = getLoadingHtml(state.status);
-                return;
-            } else {
-                ctx.status = 503;
-                ctx.body = 'Building...';
-                return;
-            }
-        }
-
-        // 3. Error
-        if (state.status === 'error') {
+        if(state.is_processed !== 1){
             ctx.type = 'html';
-            ctx.body = getErrorHtml(state.error);
+            ctx.body = getLoadingHtml(state.status);
             return;
         }
 

@@ -25,14 +25,22 @@ export const getDb = async () => {
     
     await dbInstance.exec(`
         CREATE TABLE IF NOT EXISTS chat_record (
-           id TEXT PRIMARY KEY,
-           file_name TEXT,
-           target_path TEXT,
-           is_processed INTEGER DEFAULT 0,
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
            create_time TEXT,
            update_time TEXT,
            drive_id TEXT,
-           chat_content TEXT,
+           uuid TEXT,
+           chat_content TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS build_record (
+            id TEXT,
+            file_name TEXT,
+            target_path TEXT,
+            is_processed INTEGER DEFAULT 0,
+            create_time TEXT,
+            update_time TEXT,
+            drive_id TEXT
         );
     `);
     // keep this,Init tables

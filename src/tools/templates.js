@@ -15,7 +15,7 @@ export const getLoadingHtml = (status) => `
     <div class="content">
         <div class="loader" style="margin: 0 auto 20px;"></div>
         <h2>Deployment in progress...</h2>
-        <p>Status: ${status}</p>
+        <p>Status: ${status || 'Building...'}</p>
         <p>Please wait, this page will refresh automatically.</p>
     </div>
 </body>

@@ -28,8 +28,8 @@ export const GenerateController = {
 
     async chatcontent(ctx) {
         try {
-            const response = await axios.get(`${GOOGLE_STUDIO_URL}/api/chatcontent`);
-            
+            const { driveid } = ctx.request.query;
+            const response = await axios.get(`${GOOGLE_STUDIO_URL}/api/chatcontent`, {params: driveid});
             ctx.body = response.data;
         } catch (err) {
             console.error('[GenerateController] Error:', err.message);
@@ -44,9 +44,24 @@ export const GenerateController = {
             ctx.body = { error: 'prompt is required' };
             return;
         }
-        const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
-        // 帮我改一下这里：key 是driveid，value是chatDomContent,存入数据库,表名是chat_record
-        ctx.body = response.data;
+        try {
+            const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
+            console.log('[GenerateController] initChatContent response: ', response.data);
+            const { data } = response.data;
+            if (data && data.driveid) {
+                const db = await getDb();
+                await db.run(`
+                    INSERT INTO chat_record (drive_id, chat_content, create_time)
+                    VALUES (?, ?, ?)
+                `, data.driveid, data.chatDomContent, Date.now());
+            }
+            ctx.body = response.data;
+
+        } catch (e) {
+            ctx.status = 502;
+            ctx.body = { error: 'Failed to save chat record: ' + e.message };
+            console.error('Failed to save chat record:', e);
+        }
     },
     async chatmsg(ctx) {
         const {driveid, prompt} = ctx.request.body;
@@ -55,8 +70,13 @@ export const GenerateController = {
             ctx.body = { error: 'prompt is required' };
             return;
         }
-        console.log('[GenerateController] prompt: ', prompt);
         const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/chatmsg`, { driveid, prompt });
+        const db = await getDb();
+        await db.run(`
+            UPDATE chat_record 
+            SET chat_content = ?, update_time = ?
+            WHERE drive_id = ?
+        `, response.data.chatDomContent, Date.now(), driveid);
         console.log('[GenerateController] response: ', response.data);
         ctx.body = response.data;
     },
@@ -74,15 +94,20 @@ export const GenerateController = {
     async buildCode(ctx) {
         const { data } = ctx.request.body;
         try {
-            const { fileName, targetPath, id, code } = data;
+            const { fileName, targetPath, uuid, driveid } = data;
             console.log('[GenerateController] buildCode: ', data);
             const isProcessed = 0; //1: processed, 0: not processed 2: processing
             const db = await getDb();
             
             await db.run(`
-                INSERT OR REPLACE INTO generated_codes (id, file_name, target_path, code, is_processed, date_time)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `, id, fileName, targetPath, code, isProcessed, Date.now());
+                UPDATE chat_record 
+                SET uuid = ?, update_time = ?
+                WHERE drive_id = ?
+            `, uuid, Date.now(), driveid);
+            await db.run(`
+                INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, fileName, targetPath, isProcessed, Date.now(), Date.now(), driveid, uuid);
 
             ctx.body = 'ok'
         } catch (err) {

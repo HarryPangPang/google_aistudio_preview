@@ -114,36 +114,27 @@ export default defineConfig({
     },
     async getGeneratedCode() {
         const db = await getDb();
-    
         // Check if any task is currently processing
-        const processing = await db.get('SELECT id FROM generated_codes WHERE is_processed = 2');
+        const processing = await db.get('SELECT id FROM build_record WHERE is_processed = 2');
         if (processing) {
             console.log('[BuildService] A task is already processing, skipping.');
             return;
         }
-    
         // Get oldest unprocessed task
-        const task = await db.get('SELECT * FROM generated_codes WHERE is_processed = 0 ORDER BY date_time ASC LIMIT 1');
+        const task = await db.get('SELECT * FROM build_record WHERE is_processed = 0 ORDER BY create_time ASC LIMIT 1');
         if (!task) return;
     
         console.log(`[BuildService] Processing generated code task: ${task.id}`);
     
         // Mark as processing
-        await db.run('UPDATE generated_codes SET is_processed = 2 WHERE id = ?', task.id);
+        await db.run('UPDATE build_record SET is_processed = 2 WHERE id = ?', task.id);
     
         try {
             const { id, file_name, target_path } = task;
             
-            // Determine source path
-            // Default: ../googlestudio/codedist/<id>/<file_name>
             let sourcePath = target_path;
-            if (!sourcePath) {
-                sourcePath = path.resolve(PROJECT_ROOT, '../googlestudio/codedist', id, file_name);
-            }
     
-            if (!fs.existsSync(sourcePath)) {
-                // Fallback: try without ID folder? Or just fail.
-                // User said "walk @googlestudio/codedist path under uuid".
+            if (!sourcePath || !fs.existsSync(sourcePath)) {
                 throw new Error(`Source file not found: ${sourcePath}`);
             }
     
@@ -202,30 +193,12 @@ export default defineConfig({
                 }
             }
     
-            // Mark as processed
-            await db.run('UPDATE generated_codes SET is_processed = 1 WHERE id = ?', id);
-            
-            // Update DeploymentModel
-            // Check if deployment exists
-            const existingDeploy = await DeploymentModel.get(id);
-            if (!existingDeploy) {
-                await DeploymentModel.create(id, {}, null);
-            }
-            await DeploymentModel.updateStatus(id, 'ready', { url: `http://localhost:${PORT}/deployments/${id}/` });
-    
+            await db.run('UPDATE build_record SET is_processed = 1 WHERE id = ?', id);
         } catch (err) {
             console.error(`[BuildService] Error processing task ${task.id}:`, err);
             // Mark as processed (failed) to avoid infinite loop
-            await db.run('UPDATE generated_codes SET is_processed = 1 WHERE id = ?', task.id);
+            await db.run('UPDATE build_record SET is_processed = 1 WHERE id = ?', task.id);
             
-            // Update DeploymentModel to error
-            try {
-                const existingDeploy = await DeploymentModel.get(task.id);
-                if (!existingDeploy) {
-                    await DeploymentModel.create(task.id, {}, null);
-                }
-                await DeploymentModel.updateStatus(task.id, 'error', err.message);
-            } catch (e) { /* ignore */ }
         }
     }
 };
