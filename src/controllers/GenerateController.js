@@ -46,7 +46,6 @@ export const GenerateController = {
         }
         try {
             const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
-            console.log('[GenerateController] initChatContent response: ', response.data);
             const { data } = response.data;
             if (data && data.driveid) {
                 const db = await getDb();
