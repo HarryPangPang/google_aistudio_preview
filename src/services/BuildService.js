@@ -3,7 +3,6 @@ import path from 'path';
 import { exec } from 'child_process';
 import AdmZip from 'adm-zip';
 import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
-import { DeploymentModel } from '../models/DeploymentModel.js';
 import { getDb } from '../db/index.js';
 
 export const BuildService = {
@@ -41,7 +40,7 @@ export const BuildService = {
         const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
 
         try {
-            await DeploymentModel.updateStatus(deployId, 'building');
+            // await DeploymentModel.updateStatus(deployId, 'building');
             console.log(`[BuildService] Processing ${deployId}...`);
 
             // 1. Prepare Source
@@ -49,11 +48,6 @@ export const BuildService = {
             await this.writeConfigFiles(sourceDir);
             await this.writeUserFiles(sourceDir, files);
 
-            // 2. Execute Build
-            // Use local pnpm for caching and speed
-            // --prefer-offline: use cached packages if available
-            // --silent: reduce log output
-            // --config.store-dir: optional, to force a shared store if needed, but default user store is usually fine
             const cmd = `"${pnpmPath}" install --prefer-offline --silent --no-frozen-lockfile && "${pnpmPath}" run build`;
             
             await new Promise((resolve, reject) => {
@@ -71,14 +65,12 @@ export const BuildService = {
             // 3. Verify dist
             if (await fs.pathExists(distDir)) {
                 console.log(`[BuildService] Success ${deployId}`);
-                await DeploymentModel.updateStatus(deployId, 'ready');
             } else {
                 throw new Error('Dist folder missing after build');
             }
 
         } catch (err) {
             console.error(`[BuildService] Error ${deployId}:`, err);
-            await DeploymentModel.updateStatus(deployId, 'error', err.toString());
         }
     },
 
@@ -203,6 +195,11 @@ export default defineConfig({
                 const zip = new AdmZip(tmpZipPath);
                 zip.extractAllTo(sourceDir, true);
                 console.log(`[BuildService] Extraction completed`);
+
+                // Write .env file after extraction
+                await fs.writeFile(path.join(sourceDir, '.env'), `GEMINI_API_KEY=AIzaSyDkwgtRJv4g65qk3oF0tCkYwk5cBRIjqZE
+`);
+                console.log(`[BuildService] .env file written`);
             } catch (err) {
                 console.error(`[BuildService] Extraction failed:`, err);
                 throw new Error(`Failed to extract zip: ${err.message}`);
