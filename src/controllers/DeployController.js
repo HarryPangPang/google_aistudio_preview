@@ -73,5 +73,14 @@ export const DeployController = {
         }
         
         ctx.body = state;
+    },
+
+    async importFromUrl(ctx) {
+        const { url } = ctx.request.body;
+        if (!url) {
+            ctx.status = 400;
+            ctx.body = { error: 'No URL provided' };
+            return;
+        }
     }
 };

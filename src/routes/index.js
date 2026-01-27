@@ -27,5 +27,7 @@ router.post('/api/buildcode', GenerateController.buildCode);
 router.get('/preview', PreviewController.entry);
 router.get('/playground', PreviewController.playground);
 
+router.post('/api/import', DeployController.importFromUrl);
+
 
 export default router;
