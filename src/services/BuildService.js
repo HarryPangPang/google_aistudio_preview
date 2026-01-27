@@ -120,10 +120,13 @@ export default defineConfig({
                 "paths": { "@/*": ["./src/*"] }
             }, "include": ["src"]
         }, null, 2));
-             await fs.writeFile(path.join(sourceDir, '.env'), `GEMINI_API_KEY=AIzaSyDkwgtRJv4g65qk3oF0tCkYwk5cBRIjqZE`, null, 2);
         // Index HTML
         await fs.writeFile(path.join(sourceDir, 'index.html'), `
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>App</title><script src="https://cdn.tailwindcss.com"></script></head><body><div id="root"></div><script type="module" src="/src/index.tsx"></script></body></html>`);
+
+        // .env file
+        await fs.writeFile(path.join(sourceDir, '.env'), `GEMINI_API_KEY=AIzaSyDkwgtRJv4g65qk3oF0tCkYwk5cBRIjqZE
+`);
     },
     
 
