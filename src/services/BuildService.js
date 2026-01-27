@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import AdmZip from 'adm-zip';
 import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
 import { getDb } from '../db/index.js';
+import { createEnvFile } from '../script/creaEnv.js';
 
 export const BuildService = {
     /**
@@ -116,9 +117,8 @@ export default defineConfig({
         await fs.writeFile(path.join(sourceDir, 'index.html'), `
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>App</title><script src="https://cdn.tailwindcss.com"></script></head><body><div id="root"></div><script type="module" src="/src/index.tsx"></script></body></html>`);
 
-        // .env file
-        await fs.writeFile(path.join(sourceDir, '.env'), `GEMINI_API_KEY=AIzaSyDkwgtRJv4g65qk3oF0tCkYwk5cBRIjqZE
-`);
+        // Create .env files
+        await createEnvFile(sourceDir);
     },
     
 
@@ -137,6 +137,7 @@ export default defineConfig({
         // Check if any task is currently processing
         const processing = await db.get('SELECT id FROM build_record WHERE is_processed = 2');
         if (processing) {
+            console.log(`[BuildService] ${processing.id}`);
             return;
         }
         // Get oldest unprocessed task
@@ -197,9 +198,7 @@ export default defineConfig({
                 console.log(`[BuildService] Extraction completed`);
 
                 // Write .env file after extraction
-                await fs.writeFile(path.join(sourceDir, '.env'), `GEMINI_API_KEY=AIzaSyDkwgtRJv4g65qk3oF0tCkYwk5cBRIjqZE
-`);
-                console.log(`[BuildService] .env file written`);
+                await createEnvFile(sourceDir);
             } catch (err) {
                 console.error(`[BuildService] Extraction failed:`, err);
                 throw new Error(`Failed to extract zip: ${err.message}`);
