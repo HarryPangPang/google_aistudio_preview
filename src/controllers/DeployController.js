@@ -87,7 +87,6 @@ export const DeployController = {
             const isGoogleStudioLink = url.includes('aistudio.google.com') || url.includes('google') || url.includes('studio');
 
             if (isGoogleStudioLink) {
-                // Google AI Studio 链接，调用 /api/download 接口
                 const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:1234';
                 const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/download`, { data: url });
 

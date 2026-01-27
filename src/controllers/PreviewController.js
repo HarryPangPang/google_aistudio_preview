@@ -53,7 +53,6 @@ export const PreviewController = {
         if (cleanPath === '') cleanPath = 'index.html';
         const db = await getDb();
         const state = await db.get('SELECT * FROM build_record WHERE id = ?', id);
-        console.log('state', state);
         if (!state) {
             ctx.status = 404;
             ctx.body = 'Deployment not found';
