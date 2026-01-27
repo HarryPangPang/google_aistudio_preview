@@ -8,6 +8,30 @@ import { getDb } from '../db/index.js';
 
 export const BuildService = {
     /**
+     * 带重试机制的文件复制（解决 Windows EBUSY 问题）
+     */
+    async copyFileWithRetry(src, dest, maxRetries = 5, delay = 1000) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                // 使用 readFile + writeFile 代替 copy，避免某些锁定问题
+                const buffer = await fs.readFile(src);
+                await fs.writeFile(dest, buffer);
+                return;
+            } catch (err) {
+                if (err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'EACCES') {
+                    if (i < maxRetries - 1) {
+                        console.log(`[BuildService] File busy, retrying in ${delay}ms... (${i + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                }
+                throw err;
+            }
+        }
+        throw new Error(`Failed to copy file after ${maxRetries} retries`);
+    },
+
+    /**
      * 异步处理构建任务
      */
     async processBuild(deployId, files) {
@@ -131,32 +155,67 @@ export default defineConfig({
     
         try {
             const { id, file_name, target_path } = task;
-            
+
             let sourcePath = target_path;
-    
+            console.log(`[BuildService] Source path: ${sourcePath}`);
+            console.log(`[BuildService] File name: ${file_name}`);
+
             if (!sourcePath || !fs.existsSync(sourcePath)) {
                 throw new Error(`Source file not found: ${sourcePath}`);
             }
-    
+
+            // Verify file is accessible
+            const stats = await fs.stat(sourcePath);
+            console.log(`[BuildService] Source file size: ${stats.size} bytes`);
+
             // Prepare temp dir
             const deployDir = path.join(TMP_DIR, id);
             const sourceDir = path.join(deployDir, 'source');
             const distDir = path.join(deployDir, 'dist');
-            
+
+            console.log(`[BuildService] Deploy dir: ${deployDir}`);
+
+            // Ensure directory exists, remove if exists (with retry for Windows)
+            if (await fs.pathExists(deployDir)) {
+                try {
+                    await fs.remove(deployDir);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (err) {
+                    console.warn(`[BuildService] Failed to remove existing dir: ${err.message}`);
+                }
+            }
             await fs.ensureDir(deployDir);
-            await fs.emptyDir(deployDir); 
-    
-            // Copy zip to .tmp
+
+            // Copy zip to .tmp (with retry for Windows EBUSY errors)
             const tmpZipPath = path.join(deployDir, file_name);
-            await fs.copy(sourcePath, tmpZipPath);
+            console.log(`[BuildService] Copying from ${sourcePath} to ${tmpZipPath}`);
+            await this.copyFileWithRetry(sourcePath, tmpZipPath);
+            console.log(`[BuildService] Copy completed successfully`);
     
             // Unzip (cross-platform)
             await fs.ensureDir(sourceDir);
-            const zip = new AdmZip(tmpZipPath);
-            zip.extractAllTo(sourceDir, true);
-    
-            // Delete tmp zip
-            await fs.remove(tmpZipPath);
+            console.log(`[BuildService] Extracting to ${sourceDir}`);
+
+            try {
+                const zip = new AdmZip(tmpZipPath);
+                zip.extractAllTo(sourceDir, true);
+                console.log(`[BuildService] Extraction completed`);
+            } catch (err) {
+                console.error(`[BuildService] Extraction failed:`, err);
+                throw new Error(`Failed to extract zip: ${err.message}`);
+            }
+
+            // Wait for file system to release locks (Windows issue)
+            console.log(`[BuildService] Waiting for file system to release locks...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Delete tmp zip with retry
+            try {
+                await fs.remove(tmpZipPath);
+                console.log(`[BuildService] Temp zip deleted`);
+            } catch (err) {
+                console.warn(`[BuildService] Failed to delete temp zip, continuing anyway: ${err.message}`);
+            }
     
             // Run Build
             const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
@@ -178,18 +237,21 @@ export default defineConfig({
                 });
             });
     
+            // Wait for build process to fully complete and release locks
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             // Move dist
             const possibleDist = path.join(sourceDir, 'dist');
             if (await fs.pathExists(possibleDist)) {
-                    await fs.move(possibleDist, distDir, { overwrite: true });
+                await fs.move(possibleDist, distDir, { overwrite: true });
             } else {
                 // Try 'build' folder
                 const possibleBuild = path.join(sourceDir, 'build');
                 if (await fs.pathExists(possibleBuild)) {
                     await fs.move(possibleBuild, distDir, { overwrite: true });
                 } else if (!await fs.pathExists(distDir)) {
-                     // If distDir doesn't exist (and wasn't created by build script in ../dist), fail
-                     throw new Error('Build output (dist/build) not found');
+                    // If distDir doesn't exist (and wasn't created by build script in ../dist), fail
+                    throw new Error('Build output (dist/build) not found');
                 }
             }
     
