@@ -30,5 +30,8 @@ router.get('/playground', PreviewController.playground);
 router.post('/api/import', DeployController.importFromUrl);
 router.post('/api/uploadzip', DeployController.uploadzip);
 
+router.get('/api/chatRecord', AppController.chatRecord);
+router.get('/api/buildRecord', AppController.buildRecord);
+
 
 export default router;

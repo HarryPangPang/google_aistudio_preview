@@ -1,4 +1,5 @@
 import { AppModel } from '../models/AppModel.js';
+import { getDb } from '../db/index.js';
 
 export const AppController = {
     async save(ctx) {
@@ -32,6 +33,34 @@ export const AppController = {
             ctx.body = { success: true, data: app };
         } catch (err) {
             console.error('[AppController] Get error:', err);
+            ctx.status = 500;
+            ctx.body = { error: err.message };
+        }
+    },
+    async buildRecord(ctx) {
+        try {
+            const db = await getDb();
+            const records = await db.all(`
+                SELECT id, file_name, MAX(create_time) as create_time
+                FROM build_record 
+                WHERE id IS NOT NULL AND id != "" 
+                GROUP BY file_name 
+                ORDER BY create_time DESC
+            `);
+            ctx.body = { success: true, data: records };
+        } catch (err) {
+            console.error('[AppController] buildRecord error:', err);
+            ctx.status = 500;
+            ctx.body = { error: err.message };
+        }
+    },
+    async chatRecord(ctx) {
+        try {
+            const db = await getDb();
+            const records = await db.all('SELECT * FROM chat_record WHERE uuid IS NOT NULL AND uuid != "" ORDER BY update_time DESC, create_time DESC');
+            ctx.body = { success: true, data: records };
+        } catch (err) {
+            console.error('[AppController] chatRecord error:', err);
             ctx.status = 500;
             ctx.body = { error: err.message };
         }
