@@ -2,7 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { DeploymentModel } from '../models/DeploymentModel.js';
 import { AppModel } from '../models/AppModel.js';
 import { BuildService } from '../services/BuildService.js';
-import { PORT } from '../config/constants.js';
+import { TMP_DIR } from '../config/constants.js';
+import axios from 'axios';
+import fs from 'fs-extra';
+import path from 'path';
+import AdmZip from 'adm-zip';
 
 export const DeployController = {
     /**
@@ -74,6 +78,14 @@ export const DeployController = {
         
         ctx.body = state;
     },
+    async uploadzip(ctx) {
+        const { zipFile } = ctx.request.files;
+        if (!zipFile) {
+            ctx.status = 400;
+            ctx.body = { error: 'No zip file uploaded' };
+            return;
+        }
+    },
 
     async importFromUrl(ctx) {
         const { url } = ctx.request.body;
@@ -81,6 +93,79 @@ export const DeployController = {
             ctx.status = 400;
             ctx.body = { error: 'No URL provided' };
             return;
+        }
+
+        try {
+            // 判断是否是 Google AI Studio 链接
+            const isGoogleStudioLink = url.includes('aistudio.google.com') || url.includes('google') || url.includes('studio');
+
+            if (isGoogleStudioLink) {
+                // Google AI Studio 链接，调用 /api/download 接口
+                const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:1234';
+                const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/download`, { data: url });
+
+                ctx.body = response.data;
+                return;
+            }
+
+            // 处理 ZIP 文件链接
+            if (url.toLowerCase().endsWith('.zip')) {
+                const deployId = uuidv4();
+                const deployDir = path.join(TMP_DIR, deployId);
+                const sourceDir = path.join(deployDir, 'source');
+                const distDir = path.join(deployDir, 'dist');
+
+                // 下载 ZIP 文件
+                console.log(`[DeployController] Downloading zip from ${url}`);
+                const response = await axios.get(url, {
+                    responseType: 'arraybuffer',
+                    timeout: 60000 // 60 seconds timeout
+                });
+
+                // 创建目录
+                await fs.ensureDir(deployDir);
+                await fs.ensureDir(sourceDir);
+                await fs.ensureDir(distDir);
+
+                // 保存临时 ZIP 文件
+                const tmpZipPath = path.join(deployDir, 'temp.zip');
+                await fs.writeFile(tmpZipPath, response.data);
+
+                // 解压到 source 目录
+                console.log(`[DeployController] Extracting zip to ${sourceDir}`);
+                const zip = new AdmZip(tmpZipPath);
+                zip.extractAllTo(sourceDir, true);
+
+                // 删除临时 ZIP 文件
+                await fs.remove(tmpZipPath);
+
+                // 检查是否已经有 dist 目录（产物）
+                const extractedDist = path.join(sourceDir, 'dist');
+                if (await fs.pathExists(extractedDist)) {
+                    // 将 dist 移动到外层
+                    await fs.move(extractedDist, distDir, { overwrite: true });
+                }
+
+                ctx.body = {
+                    success: true,
+                    id: deployId,
+                    message: 'ZIP file imported successfully',
+                    paths: {
+                        source: sourceDir,
+                        dist: distDir
+                    }
+                };
+                return;
+            }
+
+            // 不支持的 URL 类型
+            ctx.status = 400;
+            ctx.body = { error: 'Unsupported URL type. Only .zip files or Google AI Studio links are supported.' };
+
+        } catch (err) {
+            console.error('[DeployController] importFromUrl error:', err.message);
+            ctx.status = 500;
+            ctx.body = { error: 'Failed to import from URL: ' + err.message };
         }
     }
 };

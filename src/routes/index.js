@@ -28,6 +28,7 @@ router.get('/preview', PreviewController.entry);
 router.get('/playground', PreviewController.playground);
 
 router.post('/api/import', DeployController.importFromUrl);
+router.post('/api/uploadzip', DeployController.uploadzip);
 
 
 export default router;
