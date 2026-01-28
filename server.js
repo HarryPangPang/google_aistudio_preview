@@ -13,8 +13,10 @@ const app = new Koa();
 // Ensure Temp Directory
 fs.ensureDirSync(TMP_DIR);
 
-// Start Build Worker
-startWorker();
+// Start Build Worker (async, non-blocking)
+startWorker().catch(err => {
+    console.error('[Server] Failed to start worker:', err);
+});
 
 // Middleware
 app.use(cors({

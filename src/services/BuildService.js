@@ -137,12 +137,15 @@ export default defineConfig({
         // Check if any task is currently processing
         const processing = await db.get('SELECT id FROM build_record WHERE is_processed = 2');
         if (processing) {
-            console.log(`[BuildService] ${processing.id}`);
+            console.log(`[BuildService] Task ${processing.id} is currently processing, skipping`);
             return;
         }
         // Get oldest unprocessed task
         const task = await db.get('SELECT * FROM build_record WHERE is_processed = 0 ORDER BY create_time ASC LIMIT 1');
-        if (!task) return;
+        if (!task) {
+            console.log('[BuildService] No pending tasks found');
+            return;
+        }
     
         console.log(`[BuildService] Processing generated code task: ${task.id}`);
     

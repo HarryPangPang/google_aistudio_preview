@@ -1,12 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DeploymentModel } from '../models/DeploymentModel.js';
 import { AppModel } from '../models/AppModel.js';
-import { BuildService } from '../services/BuildService.js';
-import { TMP_DIR } from '../config/constants.js';
+import { CODEDIST_DIR } from '../config/constants.js';
+import { getDb } from '../db/index.js';
 import axios from 'axios';
 import fs from 'fs-extra';
 import path from 'path';
-import AdmZip from 'adm-zip';
 
 export const DeployController = {
     /**
@@ -66,11 +65,70 @@ export const DeployController = {
         ctx.body = state;
     },
     async uploadzip(ctx) {
-        const { zipFile } = ctx.request.files;
-        if (!zipFile) {
-            ctx.status = 400;
-            ctx.body = { error: 'No zip file uploaded' };
-            return;
+        try {
+            // 使用 formidable 解析上传的文件
+            const formidable = (await import('formidable')).default;
+            const form = formidable({
+                maxFileSize: 100 * 1024 * 1024, // 100MB
+                allowEmptyFiles: false,
+                multiples: false
+            });
+
+            const [fields, files] = await new Promise((resolve, reject) => {
+                form.parse(ctx.req, (err, fields, files) => {
+                    if (err) reject(err);
+                    else resolve([fields, files]);
+                });
+            });
+
+            const zipFile = files.zipFile?.[0] || files.zipFile;
+            if (!zipFile) {
+                ctx.status = 400;
+                ctx.body = { error: 'No zip file uploaded' };
+                return;
+            }
+
+            // 验证文件类型
+            if (!zipFile.originalFilename?.toLowerCase().endsWith('.zip')) {
+                ctx.status = 400;
+                ctx.body = { error: 'File must be a ZIP file' };
+                return;
+            }
+
+            const deployId = uuidv4();
+
+            // 确保 codedist 目录存在
+            await fs.ensureDir(CODEDIST_DIR);
+
+            // 保存上传的 ZIP 文件到 codedist 目录
+            const savedZipPath = path.join(CODEDIST_DIR, `${deployId}${zipFile.originalFilename}`);
+            await fs.copyFile(zipFile.filepath, savedZipPath);
+
+            // 删除上传的临时文件
+            await fs.remove(zipFile.filepath);
+
+            // 插入到 build_record 表，让 worker 自动处理构建
+            const db = await getDb();
+            const now = Date.now();
+
+            await db.run(`
+                INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, deployId, zipFile.originalFilename, savedZipPath, 0, now, now);
+
+            console.log(`[DeployController] ZIP file saved to ${savedZipPath} and build record created for ${deployId}`);
+
+            ctx.body = {
+                success: true,
+                id: deployId,
+                url: `preview?id=${deployId}`,
+                message: 'ZIP file uploaded successfully, build will start shortly'
+            };
+
+        } catch (err) {
+            console.error('[DeployController] uploadzip error:', err.message);
+            ctx.status = 500;
+            ctx.body = { error: 'Failed to upload zip file: ' + err.message };
         }
     },
 
@@ -97,9 +155,6 @@ export const DeployController = {
             // 处理 ZIP 文件链接
             if (url.toLowerCase().endsWith('.zip')) {
                 const deployId = uuidv4();
-                const deployDir = path.join(TMP_DIR, deployId);
-                const sourceDir = path.join(deployDir, 'source');
-                const distDir = path.join(deployDir, 'dist');
 
                 // 下载 ZIP 文件
                 console.log(`[DeployController] Downloading zip from ${url}`);
@@ -108,38 +163,30 @@ export const DeployController = {
                     timeout: 60000 // 60 seconds timeout
                 });
 
-                // 创建目录
-                await fs.ensureDir(deployDir);
-                await fs.ensureDir(sourceDir);
-                await fs.ensureDir(distDir);
+                // 确保 codedist 目录存在
+                await fs.ensureDir(CODEDIST_DIR);
 
-                // 保存临时 ZIP 文件
-                const tmpZipPath = path.join(deployDir, 'temp.zip');
-                await fs.writeFile(tmpZipPath, response.data);
+                // 保存 ZIP 文件到 codedist 目录
+                const fileName = path.basename(url);
+                const savedZipPath = path.join(CODEDIST_DIR, `${deployId}_${fileName}`);
+                await fs.writeFile(savedZipPath, response.data);
 
-                // 解压到 source 目录
-                console.log(`[DeployController] Extracting zip to ${sourceDir}`);
-                const zip = new AdmZip(tmpZipPath);
-                zip.extractAllTo(sourceDir, true);
+                // 插入到 build_record 表，让 worker 自动处理构建
+                const db = await getDb();
+                const now = Date.now();
 
-                // 删除临时 ZIP 文件
-                await fs.remove(tmpZipPath);
+                await db.run(`
+                    INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `, deployId, fileName, savedZipPath, 0, now, now);
 
-                // 检查是否已经有 dist 目录（产物）
-                const extractedDist = path.join(sourceDir, 'dist');
-                if (await fs.pathExists(extractedDist)) {
-                    // 将 dist 移动到外层
-                    await fs.move(extractedDist, distDir, { overwrite: true });
-                }
+                console.log(`[DeployController] ZIP downloaded to ${savedZipPath} and build record created for ${deployId}`);
 
                 ctx.body = {
                     success: true,
                     id: deployId,
-                    message: 'ZIP file imported successfully',
-                    paths: {
-                        source: sourceDir,
-                        dist: distDir
-                    }
+                    url: `preview?id=${deployId}`,
+                    message: 'ZIP file downloaded successfully, build will start shortly'
                 };
                 return;
             }
