@@ -41,11 +41,16 @@ export const AppController = {
         try {
             const db = await getDb();
             const records = await db.all(`
-                SELECT id, file_name, MAX(create_time) as create_time
-                FROM build_record 
-                WHERE id IS NOT NULL AND id != "" 
-                GROUP BY file_name 
-                ORDER BY create_time DESC
+                SELECT b.id, b.file_name, b.create_time, b.is_processed
+                FROM build_record b
+                INNER JOIN (
+                    SELECT file_name, MAX(create_time) as max_time
+                    FROM build_record
+                    WHERE id IS NOT NULL AND id != ""
+                    GROUP BY file_name
+                ) latest ON b.file_name = latest.file_name AND b.create_time = latest.max_time
+                WHERE b.id IS NOT NULL AND b.id != ""
+                ORDER BY b.create_time DESC
             `);
             ctx.body = { success: true, data: records };
         } catch (err) {
