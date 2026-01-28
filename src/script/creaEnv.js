@@ -7,7 +7,7 @@ import path from 'path';
  */
 export async function createEnvFile(targetDir) {
     const envLocalPath = path.join(targetDir, '.env.local');
-    const apiKey = process.env.GEMINI_API_KEY || 'AIzaSyA1IiF-zUSz50zTacvJw4CaPb_TGtcNu0E';
+    const apiKey = process.env.GEMINI_API_KEY || '';
 
     try {
         let envContent = '';
