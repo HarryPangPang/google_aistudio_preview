@@ -38,14 +38,16 @@ export const GenerateController = {
         }
     },
     async initChatContent(ctx) {
-        const { prompt } = ctx.request.body;
+        const { prompt, modelLabel, modelValue } = ctx.request.body;
         if (!prompt) {
             ctx.status = 400;
             ctx.body = { error: 'prompt is required' };
             return;
         }
         try {
-            const response = await axios.post(`${GOOGLE_STUDIO_URL}/api/initChatContent`, { prompt });
+            const response = await axios.post(
+                `${GOOGLE_STUDIO_URL}/api/initChatContent`, 
+                { prompt, modelLabel, modelValue });
             const { data } = response.data;
             if (data && data.driveid) {
                 const db = await getDb();
