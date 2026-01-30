@@ -4,6 +4,7 @@ import send from 'koa-send';
 import { TMP_DIR, PLAYGROUND_DIST_DIR } from '../config/constants.js';
 import { getLoadingHtml, getErrorHtml } from '../tools/templates.js';
 import { getDb } from '../db/index.js';
+import { GameStatsModel } from '../models/GameStatsModel.js';
 
 export const PreviewController = {
     /**
@@ -51,6 +52,18 @@ export const PreviewController = {
 
         let cleanPath = subPath.startsWith('/') ? subPath.slice(1) : subPath;
         if (cleanPath === '') cleanPath = 'index.html';
+
+        // Track game access if this is the initial page load with shared_by parameter
+        if (cleanPath === 'index.html' && ctx.query.shared_by) {
+            try {
+                const sharedBy = ctx.query.shared_by;
+                await GameStatsModel.trackClick(id, sharedBy);
+                console.log(`[PreviewController] Tracked deployment access: gameId=${id}, sharedBy=${sharedBy}`);
+            } catch (error) {
+                console.error('[PreviewController] Failed to track deployment access:', error);
+                // Don't block the request if tracking fails
+            }
+        }
         const db = await getDb();
         const state = await db.get('SELECT * FROM build_record WHERE id = ?', id);
         if (!state) {
