@@ -42,6 +42,28 @@ export const getDb = async () => {
             update_time TEXT,
             drive_id TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            username TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS verification_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            code TEXT NOT NULL,
+            type TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used INTEGER DEFAULT 0,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
+        CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at);
     `);
     // keep this,Init tables
     // await dbInstance.exec(`
