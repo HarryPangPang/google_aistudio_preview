@@ -95,7 +95,7 @@ const scanAndProcess = async () => {
             }
         } else {
             // 没有任务，10秒后再扫描
-            console.log('[Worker] No pending tasks, will scan in 10s');
+            // console.log('[Worker] No pending tasks, will scan in 10s');
             scheduleNextScan(SCAN_INTERVAL.IDLE);
         }
     } catch (err) {
