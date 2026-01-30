@@ -64,6 +64,17 @@ export const getDb = async () => {
 
         CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
         CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at);
+
+        CREATE TABLE IF NOT EXISTS game_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id TEXT NOT NULL,
+            shared_by TEXT,
+            clicked_at INTEGER NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_game_stats_game_id ON game_stats(game_id);
+        CREATE INDEX IF NOT EXISTS idx_game_stats_shared_by ON game_stats(shared_by);
     `);
     // keep this,Init tables
     // await dbInstance.exec(`

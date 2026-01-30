@@ -4,6 +4,7 @@ import { PreviewController } from '../controllers/PreviewController.js';
 import { AppController } from '../controllers/AppController.js';
 import { GenerateController } from '../controllers/GenerateController.js';
 import { AuthController } from '../controllers/AuthController.js';
+import { GameController } from '../controllers/GameController.js';
 
 const router = new Router();
 
@@ -46,6 +47,12 @@ router.post('/api/chatmsg', AuthController.authenticate, GenerateController.chat
 router.post('/api/download', AuthController.authenticate, GenerateController.downloadcode);
 router.post('/api/deploywithcode', AuthController.authenticate, GenerateController.deploywithcode);
 router.post('/api/buildcode', AuthController.authenticate, GenerateController.buildCode);
+
+// Game Statistics Routes - 游戏统计
+router.post('/api/game/track', AuthController.authenticate, GameController.trackClick);
+router.get('/api/game/stats/:gameId', AuthController.authenticate, GameController.getStats);
+router.get('/api/game/stats/:gameId/detailed', AuthController.authenticate, GameController.getDetailedStats);
+router.get('/api/game/user/:userId/shares', AuthController.authenticate, GameController.getUserShareStats);
 
 
 export default router;
