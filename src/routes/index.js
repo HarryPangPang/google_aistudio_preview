@@ -5,6 +5,7 @@ import { AppController } from '../controllers/AppController.js';
 import { GenerateController } from '../controllers/GenerateController.js';
 import { AuthController } from '../controllers/AuthController.js';
 import { GameController } from '../controllers/GameController.js';
+import { ProjectController } from '../controllers/ProjectController.js';
 
 const router = new Router();
 
@@ -53,6 +54,16 @@ router.post('/api/game/track', AuthController.authenticate, GameController.track
 router.get('/api/game/stats/:gameId', AuthController.authenticate, GameController.getStats);
 router.get('/api/game/stats/:gameId/detailed', AuthController.authenticate, GameController.getDetailedStats);
 router.get('/api/game/user/:userId/shares', AuthController.authenticate, GameController.getUserShareStats);
+
+// Project Routes - 项目管理
+router.post('/api/projects', AuthController.authenticate, ProjectController.create);
+router.post('/api/projects/save', AuthController.authenticate, ProjectController.createOrUpdate);
+router.post('/api/projects/migrate', AuthController.authenticate, ProjectController.migrate);
+router.get('/api/projects', AuthController.authenticate, ProjectController.getList);
+router.get('/api/projects/by-driveid/:driveid', AuthController.authenticate, ProjectController.getByDriveid);
+router.get('/api/projects/:id', AuthController.authenticate, ProjectController.getById);
+router.put('/api/projects/:id', AuthController.authenticate, ProjectController.update);
+router.delete('/api/projects/:id', AuthController.authenticate, ProjectController.delete);
 
 
 export default router;

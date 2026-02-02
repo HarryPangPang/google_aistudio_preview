@@ -76,6 +76,32 @@ export const getDb = async () => {
 
         CREATE INDEX IF NOT EXISTS idx_game_stats_game_id ON game_stats(game_id);
         CREATE INDEX IF NOT EXISTS idx_game_stats_shared_by ON game_stats(shared_by);
+
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            username TEXT,
+            type TEXT,
+            platform_id TEXT,
+            model_label TEXT,
+            model_value TEXT,
+            title TEXT,
+            prompt TEXT,
+            chat_content TEXT,
+            driveid TEXT,
+            deploy_url TEXT,
+            deploy_type TEXT,
+            status TEXT DEFAULT 'draft',
+            files TEXT,
+            source_url TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+        CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+        CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at);
     `);
     // keep this,Init tables
     // await dbInstance.exec(`
