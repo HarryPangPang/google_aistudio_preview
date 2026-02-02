@@ -314,13 +314,16 @@ export class AuthController {
      */
     static async authenticate(ctx, next) {
         const token = ctx.headers.authorization?.replace('Bearer ', '');
-
+        if(ctx.state.isInternalService) {
+            // 来自内部服务的请求，跳过用户认证
+            await next();
+            return;
+        }
         if (!token) {
             ctx.status = 401;
             ctx.body = { success: false, message: '未提供认证令牌' };
             return;
         }
-
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
             ctx.state.user = decoded;

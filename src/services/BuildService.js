@@ -5,6 +5,7 @@ import AdmZip from 'adm-zip';
 import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
 import { getDb } from '../db/index.js';
 import { createEnvFile } from '../script/creaEnv.js';
+import { ScreenshotService } from './ScreenshotService.js';
 
 export const BuildService = {
     /**
@@ -258,11 +259,22 @@ export default defineConfig({
             }
     
             await db.run('UPDATE build_record SET is_processed = 1 WHERE id = ?', id);
+
+            // Generate cover screenshot after successful build
+            console.log(`[BuildService] Generating cover screenshot for ${id}...`);
+            try {
+                await ScreenshotService.generateCover(id);
+                console.log(`[BuildService] Cover screenshot generated successfully for ${id}`);
+            } catch (screenshotErr) {
+                console.error(`[BuildService] Failed to generate cover for ${id}:`, screenshotErr.message);
+                // Don't fail the whole build if screenshot fails
+            }
+
         } catch (err) {
             console.error(`[BuildService] Error processing task ${task.id}:`, err);
             // Mark as processed (failed) to avoid infinite loop
             await db.run('UPDATE build_record SET is_processed = 1 WHERE id = ?', task.id);
-            
+
         }
     }
 };
