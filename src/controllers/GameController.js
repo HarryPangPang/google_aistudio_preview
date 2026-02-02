@@ -157,5 +157,62 @@ export const GameController = {
                 error: error.message
             };
         }
+    },
+
+    /**
+     * Get statistics for multiple games in a single request
+     * POST /api/game/stats/batch
+     * Body: { gameIds: string[] }
+     */
+    async getBatchStats(ctx) {
+        try {
+            const { gameIds } = ctx.request.body;
+
+            // Validate gameIds
+            if (!Array.isArray(gameIds)) {
+                ctx.status = 400;
+                ctx.body = {
+                    success: false,
+                    message: 'gameIds must be an array'
+                };
+                return;
+            }
+
+            if (gameIds.length === 0) {
+                ctx.status = 200;
+                ctx.body = {
+                    success: true,
+                    data: {}
+                };
+                return;
+            }
+
+            // Limit batch size to prevent abuse
+            if (gameIds.length > 100) {
+                ctx.status = 400;
+                ctx.body = {
+                    success: false,
+                    message: 'Maximum 100 games per batch request'
+                };
+                return;
+            }
+
+            // Get stats for all games
+            const stats = await GameStatsModel.getBatchPlayCounts(gameIds);
+
+            ctx.status = 200;
+            ctx.body = {
+                success: true,
+                data: stats
+            };
+        } catch (error) {
+            console.error('[GameController] Get batch stats error:', error);
+            ctx.status = 500;
+            ctx.body = {
+                success: false,
+                message: 'Failed to get batch game statistics',
+                error: error.message
+            };
+        }
     }
 };

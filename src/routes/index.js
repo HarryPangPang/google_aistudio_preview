@@ -51,6 +51,7 @@ router.post('/api/buildcode', AuthController.authenticate, GenerateController.bu
 
 // Game Statistics Routes - 游戏统计
 router.post('/api/game/track', AuthController.authenticate, GameController.trackClick);
+router.post('/api/game/stats/batch', AuthController.authenticate, GameController.getBatchStats);
 router.get('/api/game/stats/:gameId', AuthController.authenticate, GameController.getStats);
 router.get('/api/game/stats/:gameId/detailed', AuthController.authenticate, GameController.getDetailedStats);
 router.get('/api/game/user/:userId/shares', AuthController.authenticate, GameController.getUserShareStats);
