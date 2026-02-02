@@ -6,8 +6,34 @@ import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
 import { getDb } from '../db/index.js';
 import { createEnvFile } from '../script/creaEnv.js';
 import { ScreenshotService } from './ScreenshotService.js';
+import { DependencyCacheService } from './DependencyCacheService.js';
 
 export const BuildService = {
+    /**
+     * 获取默认的 package.json 配置
+     */
+    getDefaultPackageJson() {
+        return {
+            "name": "react-playground-deploy",
+            "version": "0.0.0",
+            "type": "module",
+            "scripts": { "build": "vite build" },
+            "dependencies": {
+                "react": "^19.2.4",
+                "@google/genai": "^1.39.0",
+                "react-dom": "^19.2.4"
+            },
+            "devDependencies": {
+                "@types/react": "^19.0.0",
+                "@types/react-dom": "^19.0.0",
+                "@vitejs/plugin-react": "^4.2.1",
+                "typescript": "^5.2.2",
+                "vite": "^5.0.0",
+                "@types/node": "^22.14.0",
+            }
+        };
+    },
+
     /**
      * 带重试机制的文件复制（解决 Windows EBUSY 问题）
      */
@@ -33,7 +59,7 @@ export const BuildService = {
     },
 
     /**
-     * 异步处理构建任务
+     * 异步处理构建任务 暂时不用了
      */
     async processBuild(deployId, files) {
         const deployDir = path.join(TMP_DIR, deployId);
@@ -50,8 +76,13 @@ export const BuildService = {
             await this.writeConfigFiles(sourceDir);
             await this.writeUserFiles(sourceDir, files);
 
-            const cmd = `"${pnpmPath}" install --prefer-offline --silent --no-frozen-lockfile && "${pnpmPath}" run build`;
-            
+            // 2. Use dependency cache instead of installing from scratch
+            await DependencyCacheService.prepareDependencies(sourceDir, this.getDefaultPackageJson());
+
+            // 3. Build only (dependencies already prepared)
+            const pnpmCmd = fs.existsSync(pnpmPath) ? `"${pnpmPath}"` : 'pnpm';
+            const cmd = `${pnpmCmd} run build`;
+
             await new Promise((resolve, reject) => {
                 exec(cmd, { cwd: sourceDir, timeout: 300000 }, (error, stdout, stderr) => {
                     if (error) {
@@ -64,7 +95,7 @@ export const BuildService = {
                 });
             });
 
-            // 3. Verify dist
+            // 4. Verify dist
             if (await fs.pathExists(distDir)) {
                 console.log(`[BuildService] Success ${deployId}`);
             } else {
@@ -133,6 +164,7 @@ export default defineConfig({
             await fs.writeFile(fullPath, content);
         }
     },
+    // 真正的获取并处理生成代码的构建任务
     async getGeneratedCode() {
         const db = await getDb();
         // Check if any task is currently processing
@@ -219,14 +251,31 @@ export default defineConfig({
             } catch (err) {
                 console.warn(`[BuildService] Failed to delete temp zip, continuing anyway: ${err.message}`);
             }
-    
             // Run Build
             const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
             // Ensure pnpm exists, otherwise use global pnpm or npm
             const pnpmCmd = fs.existsSync(pnpmPath) ? `"${pnpmPath}"` : 'pnpm';
             
+            // const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
+
+
+            console.log(`[BuildService] Preparing dependencies for ${id}...`);
+
+            const packageJsonPath = path.join(sourceDir, 'package.json');
+            let packageJson;
+            if (await fs.pathExists(packageJsonPath)) {
+                packageJson = await fs.readJson(packageJsonPath);
+            } else {
+                packageJson = this.getDefaultPackageJson();
+            }
+            console.log(`[BuildService] Using package.json:`, packageJson);
+
+            // Use dependency cache
+            // await DependencyCacheService.prepareDependencies(sourceDir, packageJson);
+
+            // Build only (dependencies already prepared)
             const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
-            
+
             console.log(`[BuildService] Executing build for ${id}...`);
             await new Promise((resolve, reject) => {
                 exec(cmd, { cwd: sourceDir, timeout: 600000 }, (error, stdout, stderr) => {

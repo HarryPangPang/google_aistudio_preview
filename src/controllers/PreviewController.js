@@ -32,6 +32,8 @@ export const PreviewController = {
         ctx.redirect(`/deployments/${id}/`);
     },
 
+
+
     /**
      * Serve static files or loading page
      */

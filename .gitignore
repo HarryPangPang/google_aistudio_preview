@@ -8,3 +8,4 @@ dist
 .tmp
 database
 package-lock.json
+.cache

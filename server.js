@@ -14,9 +14,8 @@ const app = new Koa();
 // 内部服务认证 token（与 auto_proxy 保持一致）
 const INTERNAL_SERVICE_TOKEN = 'internal-service-proxy-2024-secret-token-xyz';
 
-// Ensure Temp Directory and Covers Directory
+// Ensure Temp Directory  Directory
 fs.ensureDirSync(TMP_DIR);
-fs.ensureDirSync(path.join(TMP_DIR, 'covers'));
 
 // Start Build Worker (async, non-blocking)
 startWorker().catch(err => {
@@ -60,14 +59,23 @@ app.use(bodyParser({
     textLimit: '50mb'
 }));
 
-// Serve cover images from /covers path
+// Serve cover images from /covers path (PNG and SVG)
 app.use(async (ctx, next) => {
-    if (ctx.path.startsWith('/covers/')) {
-        const coverPath = path.join(TMP_DIR, ctx.path);
-        if (await fs.pathExists(coverPath)) {
-            ctx.type = 'image/png';
-            ctx.body = fs.createReadStream(coverPath);
-            return;
+    if (ctx.path.includes('/covers/')) {
+        if (ctx.path.endsWith('.png')) {
+            const coverPath = path.join(TMP_DIR, ctx.path);
+            if (await fs.pathExists(coverPath)) {
+                ctx.type = 'image/png';
+                ctx.body = fs.createReadStream(coverPath);
+                return;
+            }
+        } else if (ctx.path.endsWith('.svg')) {
+            const coverPath = path.join(TMP_DIR, ctx.path);
+            if (await fs.pathExists(coverPath)) {
+                ctx.type = 'image/svg+xml';
+                ctx.body = fs.createReadStream(coverPath);
+                return;
+            }
         }
     }
     await next();
@@ -81,5 +89,4 @@ app.use(PreviewController.serve);
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
-    console.log(`Temp Directory: ${TMP_DIR}`);
 });
