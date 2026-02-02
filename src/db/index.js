@@ -30,7 +30,9 @@ export const getDb = async () => {
            update_time TEXT,
            drive_id TEXT,
            uuid TEXT,
-           chat_content TEXT
+           chat_content TEXT,
+            user_id INTEGER,
+            username TEXT
         );
 
         CREATE TABLE IF NOT EXISTS build_record (
@@ -41,7 +43,9 @@ export const getDb = async () => {
             create_time TEXT,
             update_time TEXT,
             cover_url TEXT,
-            drive_id TEXT
+            drive_id TEXT,
+            user_id INTEGER,
+            username TEXT
         );
 
         CREATE TABLE IF NOT EXISTS users (

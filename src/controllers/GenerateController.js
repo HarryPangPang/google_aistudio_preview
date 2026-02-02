@@ -39,6 +39,7 @@ export const GenerateController = {
     },
     async initChatContent(ctx) {
         const { prompt, modelLabel, modelValue } = ctx.request.body;
+        const user = ctx.state.user;
         if (!prompt) {
             ctx.status = 400;
             ctx.body = { error: 'prompt is required' };
@@ -52,9 +53,9 @@ export const GenerateController = {
             if (data && data.driveid) {
                 const db = await getDb();
                 await db.run(`
-                    INSERT INTO chat_record (drive_id, chat_content, create_time)
-                    VALUES (?, ?, ?)
-                `, data.driveid, data.chatDomContent, Date.now());
+                    INSERT INTO chat_record (drive_id, chat_content, create_time, user_id, username)
+                    VALUES (?, ?, ?, ?, ?)
+                `, data.driveid, data.chatDomContent, Date.now(), user?.id || null, user?.username || user?.email || null);
             }
             ctx.body = response.data;
 
@@ -99,16 +100,19 @@ export const GenerateController = {
             console.log('[GenerateController] buildCode: ', data);
             const isProcessed = 0; //1: processed, 0: not processed 2: processing
             const db = await getDb();
-            
+
             await db.run(`
-                UPDATE chat_record 
+                UPDATE chat_record
                 SET uuid = ?, update_time = ?
                 WHERE drive_id = ?
             `, uuid, Date.now(), driveid);
+            const r = db.run(`SELECT * FROM chat_record WHERE drive_id = ? limit 1`, driveid);
+            const existingRecord = await r;
+            const user = existingRecord ? { id: existingRecord.user_id, username: existingRecord.username } : null;
             await db.run(`
-                INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, fileName, targetPath, isProcessed, Date.now(), Date.now(), driveid, uuid);
+                INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, fileName, targetPath, isProcessed, Date.now(), Date.now(), driveid, uuid, user?.id || null, user?.username || user?.email || null);
 
             ctx.body = 'ok'
         } catch (err) {

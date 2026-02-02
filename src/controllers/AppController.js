@@ -41,7 +41,15 @@ export const AppController = {
         try {
             const db = await getDb();
             const records = await db.all(`
-                SELECT b.id, b.file_name, b.create_time, b.is_processed, b.cover_url
+                SELECT
+                    b.id,
+                    b.file_name,
+                    b.create_time,
+                    b.is_processed,
+                    b.cover_url,
+                    b.drive_id,
+                    p.user_id,
+                    u.username
                 FROM build_record b
                 INNER JOIN (
                     SELECT file_name, MAX(create_time) as max_time
@@ -49,9 +57,12 @@ export const AppController = {
                     WHERE id IS NOT NULL AND id != ""
                     GROUP BY file_name
                 ) latest ON b.file_name = latest.file_name AND b.create_time = latest.max_time
+                LEFT JOIN projects p ON b.drive_id = p.id
+                LEFT JOIN users u ON p.user_id = u.id
                 WHERE b.id IS NOT NULL AND b.id != ""
                 ORDER BY b.create_time DESC
             `);
+
             ctx.body = { success: true, data: records };
         } catch (err) {
             console.error('[AppController] buildRecord error:', err);

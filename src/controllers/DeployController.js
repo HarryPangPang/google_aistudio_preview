@@ -65,6 +65,7 @@ export const DeployController = {
         ctx.body = state;
     },
     async uploadzip(ctx) {
+        const user = ctx.state.user;
         try {
             // 使用 formidable 解析上传的文件
             const formidable = (await import('formidable')).default;
@@ -112,9 +113,9 @@ export const DeployController = {
             const now = Date.now();
 
             await db.run(`
-                INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `, deployId, zipFile.originalFilename, savedZipPath, 0, now, now);
+                INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time, user_id, username)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, deployId, zipFile.originalFilename, savedZipPath, 0, now, now, user?.id || null, user?.username || user?.email || null);
 
             console.log(`[DeployController] ZIP file saved to ${savedZipPath} and build record created for ${deployId}`);
 
@@ -134,6 +135,7 @@ export const DeployController = {
 
     async importFromUrl(ctx) {
         const { url } = ctx.request.body;
+        const user = ctx.state.user;
         if (!url) {
             ctx.status = 400;
             ctx.body = { error: 'No URL provided' };
@@ -176,9 +178,9 @@ export const DeployController = {
                 const now = Date.now();
 
                 await db.run(`
-                    INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                `, deployId, fileName, savedZipPath, 0, now, now);
+                    INSERT INTO build_record (id, file_name, target_path, is_processed, create_time, update_time, user_id, username)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `, deployId, fileName, savedZipPath, 0, now, now, user?.id || null, user?.username || user?.email || null);
 
                 console.log(`[DeployController] ZIP downloaded to ${savedZipPath} and build record created for ${deployId}`);
 
