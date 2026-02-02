@@ -40,6 +40,7 @@ export const getDb = async () => {
             is_processed INTEGER DEFAULT 0,
             create_time TEXT,
             update_time TEXT,
+            cover_url TEXT,
             drive_id TEXT
         );
 

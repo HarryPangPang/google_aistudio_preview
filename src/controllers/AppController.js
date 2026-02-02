@@ -41,7 +41,7 @@ export const AppController = {
         try {
             const db = await getDb();
             const records = await db.all(`
-                SELECT b.id, b.file_name, b.create_time, b.is_processed
+                SELECT b.id, b.file_name, b.create_time, b.is_processed, b.cover_url
                 FROM build_record b
                 INNER JOIN (
                     SELECT file_name, MAX(create_time) as max_time

@@ -69,10 +69,10 @@ export const ScreenshotService = {
         try {
             const deployDir = path.join(TMP_DIR, gameId);
             // Prepare cover directory
-            const coversDir = path.join(deployDir, 'covers');
+            const coversDir = path.join(deployDir, '/dist');
             await fs.ensureDir(coversDir);
 
-            const coverPath = path.join(coversDir, `${gameId}.png`);
+            const coverPath = path.join(coversDir, `cover.png`);
 
             // If cover already exists, skip generation
             if (await fs.pathExists(coverPath)) {
@@ -145,7 +145,7 @@ export const ScreenshotService = {
 
             // Update database with cover URL
             const db = await getDb();
-            const coverUrl = `/covers/${gameId}.png`;
+            const coverUrl = `/${gameId}/cover.png`;
             await db.run(
                 'UPDATE build_record SET cover_url = ? WHERE id = ?',
                 coverUrl,
