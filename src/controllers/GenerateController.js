@@ -1,8 +1,17 @@
 import axios from 'axios';
 import { getDb } from '../db/index.js';
+import { ClaudeAgentService } from '../services/ClaudeAgentService.js';
+import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import fs from 'fs-extra';
+import AdmZip from 'adm-zip';
+import { TMP_DIR } from '../config/constants.js';
 
 // Assuming GoogleStudio service runs on port 1234
 const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:1234';
+
+// Claude API Key from environment
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
 
 export const GenerateController = {
     async generate(ctx) {
@@ -38,16 +47,24 @@ export const GenerateController = {
         }
     },
     async initChatContent(ctx) {
-        const { prompt, modelLabel, modelValue } = ctx.request.body;
+        const { prompt, modelLabel, modelValue, platformId } = ctx.request.body;
         const user = ctx.state.user;
+
         if (!prompt) {
             ctx.status = 400;
             ctx.body = { error: 'prompt is required' };
             return;
         }
+
+        // 检查是否使用 Claude (platformId === 'anthropic')
+        if (platformId === 'anthropic') {
+            return await this.initClaudeChat(ctx, prompt, modelLabel, modelValue, user);
+        }
+
+        // 默认使用 Google Studio
         try {
             const response = await axios.post(
-                `${GOOGLE_STUDIO_URL}/api/initChatContent`, 
+                `${GOOGLE_STUDIO_URL}/api/initChatContent`,
                 { prompt, modelLabel, modelValue });
             const { data } = response.data;
             if (data && data.driveid) {
@@ -63,6 +80,90 @@ export const GenerateController = {
             ctx.status = 502;
             ctx.body = { error: 'Failed to save chat record: ' + e.message };
             console.error('Failed to save chat record:', e);
+        }
+    },
+
+    /**
+     * 使用 Claude Agent 初始化聊天并生成项目
+     */
+    async initClaudeChat(ctx, prompt, modelLabel, modelValue, user) {
+        try {
+            if (!CLAUDE_API_KEY) {
+                ctx.status = 400;
+                ctx.body = {
+                    success: false,
+                    error: 'Claude API Key not configured. Please set CLAUDE_API_KEY environment variable.'
+                };
+                return;
+            }
+
+            console.log('[GenerateController] Using Claude to generate project');
+
+            // 创建 Claude Agent Service
+            const claudeService = new ClaudeAgentService(CLAUDE_API_KEY);
+
+            // 生成项目文件
+            const files = await claudeService.generateProject(prompt);
+
+            // 生成唯一 ID
+            const driveid = uuidv4();
+            const uuid = uuidv4();
+            const fileName = `claude-${Date.now()}.zip`;
+
+            // 创建 ZIP 文件
+            const zipPath = path.join(TMP_DIR, 'codedist', fileName);
+            await fs.ensureDir(path.dirname(zipPath));
+
+            const zip = new AdmZip();
+            for (const [filePath, content] of Object.entries(files)) {
+                zip.addFile(filePath, Buffer.from(content, 'utf-8'));
+            }
+            zip.writeZip(zipPath);
+
+            console.log('[GenerateController] Created ZIP file:', zipPath);
+
+            // 保存聊天记录
+            const db = await getDb();
+            await db.run(`
+                INSERT INTO chat_record (drive_id, uuid, chat_content, create_time, user_id, username)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, driveid, uuid, `Claude generated project for: ${prompt}`, Date.now(), user?.id || null, user?.username || user?.email || null);
+
+            // 保存构建记录
+            const targetPath = zipPath;
+            const isProcessed = 0; // 等待处理
+            await db.run(`
+                INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, fileName, targetPath, isProcessed, Date.now(), Date.now(), driveid, uuid, user?.id || null, user?.username || user?.email || null);
+
+            console.log('[GenerateController] Claude project created successfully:', {
+                driveid,
+                uuid,
+                fileName
+            });
+
+            // 返回响应（模拟 Google Studio 的响应格式）
+            ctx.body = {
+                success: true,
+                data: {
+                    driveid,
+                    uuid,
+                    fileName,
+                    targetPath,
+                    chatDomContent: `Generated with Claude: ${prompt}`,
+                    files: Object.keys(files)
+                },
+                message: 'Project generated successfully with Claude'
+            };
+
+        } catch (error) {
+            console.error('[GenerateController] Claude generation error:', error);
+            ctx.status = 500;
+            ctx.body = {
+                success: false,
+                error: 'Failed to generate project with Claude: ' + error.message
+            };
         }
     },
     async chatmsg(ctx) {
