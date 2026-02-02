@@ -84,7 +84,7 @@ export const ScreenshotService = {
             const browserAvailable = await this.checkBrowserInstalled();
             if (!browserAvailable) {
                 console.warn(`[ScreenshotService] Browser not available, generating fallback cover`);
-                return await this.generateFallbackCover(gameId, 'Browser not installed');
+                return
             }
 
             // Launch browser
