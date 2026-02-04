@@ -70,6 +70,7 @@ export class AIService {
     }
     if (apiKeys.google) {
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKeys.google;
+      process.env.GEMINI_API_KEY = apiKeys.google;
     }
     if (apiKeys.openai) {
       process.env.OPENAI_API_KEY = apiKeys.openai;

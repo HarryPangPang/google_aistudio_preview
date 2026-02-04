@@ -17,7 +17,7 @@ import { TMP_DIR } from '../config/constants.js';
 // 初始化 AI Service（使用 Vercel AI SDK）
 const aiService = new AIService({
     anthropic: process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY,
-    google: process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    google: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     openai: process.env.OPENAI_API_KEY
 });
 
