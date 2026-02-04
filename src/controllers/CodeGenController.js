@@ -8,10 +8,10 @@ import { getDb } from '../db/index.js';
 import { AIService } from '../services/AIService.js';
 import { MessageModel } from '../models/MessageModel.js';
 import { ProjectModel } from '../models/ProjectModel.js';
+import { BuildService } from '../services/BuildService.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs-extra';
-import AdmZip from 'adm-zip';
 import { TMP_DIR } from '../config/constants.js';
 
 // 初始化 AI Service（使用 Vercel AI SDK）
@@ -20,6 +20,122 @@ const aiService = new AIService({
     google: process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     openai: process.env.OPENAI_API_KEY
 });
+
+/**
+ * 确保必要的配置文件存在
+ * 如果 AI 没有生成某些必需的配置文件，使用默认配置
+ */
+async function ensureConfigFiles(sourceDir, files) {
+    const fileList = Object.keys(files);
+
+    // 检查并添加 package.json（如果不存在）
+    if (!fileList.some(f => f === 'package.json' || f.endsWith('/package.json'))) {
+        console.log('[CodeGenController] Adding default package.json');
+        const packageJson = BuildService.getDefaultPackageJson();
+        await fs.writeFile(
+            path.join(sourceDir, 'package.json'),
+            JSON.stringify(packageJson, null, 2)
+        );
+    }
+
+    // 检查并添加 vite.config.ts（如果不存在）
+    if (!fileList.some(f => f.includes('vite.config'))) {
+        console.log('[CodeGenController] Adding default vite.config.ts');
+        const viteConfig = `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  build: {
+    outDir: '../dist',
+    emptyOutDir: true,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // 忽略某些警告
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
+        warn(warning);
+      }
+    }
+  },
+  esbuild: {
+    // 忽略 TypeScript 检查错误
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
+  }
+});`;
+        await fs.writeFile(path.join(sourceDir, 'vite.config.ts'), viteConfig);
+    }
+
+    // 检查并添加 tsconfig.json（如果不存在）
+    if (!fileList.some(f => f === 'tsconfig.json' || f.endsWith('/tsconfig.json'))) {
+        console.log('[CodeGenController] Adding default tsconfig.json');
+        const tsConfig = {
+            compilerOptions: {
+                target: "ES2020",
+                useDefineForClassFields: true,
+                lib: ["ES2020", "DOM", "DOM.Iterable"],
+                module: "ESNext",
+                skipLibCheck: true,
+                moduleResolution: "bundler",
+                allowImportingTsExtensions: true,
+                resolveJsonModule: true,
+                isolatedModules: true,
+                noEmit: true,
+                jsx: "react-jsx",
+                strict: false,
+                noUnusedLocals: false,
+                noUnusedParameters: false,
+                paths: { "@/*": ["./src/*"] }
+            },
+            include: ["src"]
+        };
+        await fs.writeFile(
+            path.join(sourceDir, 'tsconfig.json'),
+            JSON.stringify(tsConfig, null, 2)
+        );
+    }
+
+    // 检查并添加 tsconfig.node.json（如果不存在）
+    if (!fileList.some(f => f.includes('tsconfig.node'))) {
+        console.log('[CodeGenController] Adding default tsconfig.node.json');
+        const tsConfigNode = {
+            compilerOptions: {
+                composite: true,
+                skipLibCheck: true,
+                module: "ESNext",
+                moduleResolution: "bundler",
+                allowSyntheticDefaultImports: true
+            },
+            include: ["vite.config.ts"]
+        };
+        await fs.writeFile(
+            path.join(sourceDir, 'tsconfig.node.json'),
+            JSON.stringify(tsConfigNode, null, 2)
+        );
+    }
+
+    // 检查并添加 index.html（如果不存在）
+    if (!fileList.some(f => f === 'index.html' || f.endsWith('/index.html'))) {
+        console.log('[CodeGenController] Adding default index.html');
+        const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>`;
+        await fs.writeFile(path.join(sourceDir, 'index.html'), indexHtml);
+    }
+}
+
 export const CodeGenController = {
     /**
      * 初始化代码生成会话
@@ -116,16 +232,23 @@ export const CodeGenController = {
 
             console.log(`[CodeGenController] Generated ${Object.keys(files).length} files`);
 
-            // 创建 ZIP 文件
-            const fileName = `codegen-${Date.now()}.zip`;
-            const zipPath = path.join(TMP_DIR, 'codedist', fileName);
-            await fs.ensureDir(path.dirname(zipPath));
+            // 直接保存文件到 .tmp/source/{chatId} 目录（不压缩）
+            const sourceDir = path.join(TMP_DIR, sessionId,'source');
+            await fs.ensureDir(sourceDir);
 
-            const zip = new AdmZip();
+            // 写入所有文件
             for (const [filePath, content] of Object.entries(files)) {
-                zip.addFile(filePath, Buffer.from(content, 'utf-8'));
+                const fullPath = path.join(sourceDir, filePath);
+                await fs.ensureDir(path.dirname(fullPath));
+                await fs.writeFile(fullPath, content, 'utf-8');
             }
-            zip.writeZip(zipPath);
+
+            // 确保必要的配置文件存在（如果 AI 没有生成）
+            await ensureConfigFiles(sourceDir, files);
+
+            console.log(`[CodeGenController] Files saved to ${sourceDir}`);
+                        // 生成文件名，用于标识这个代码包
+            const fileName = `codegen-${chatId}-${Date.now()}`;
 
             // 保存 AI 响应消息
             const aiResponse = `Generated ${Object.keys(files).length} files`;
@@ -144,12 +267,13 @@ export const CodeGenController = {
             await db.run(`
                 INSERT INTO chat_record (drive_id, uuid, chat_content, create_time, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?)
-            `, chatId, sessionId, aiResponse, Date.now(), user?.id || null, user?.username || user?.email || null);
+            `, chatId, sessionId, files, Date.now(), user?.id || null, user?.username || user?.email || null);
 
+            // 记录构建信息，target_path 改为 source 目录
             await db.run(`
                 INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, fileName, zipPath, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
+            `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
             // 如果有项目 ID，更新项目信息
             if (projectId) {
@@ -160,17 +284,18 @@ export const CodeGenController = {
                 });
             }
 
+
             // 返回响应
             ctx.body = {
                 success: true,
                 data: {
                     chatId,
                     sessionId,
+                    fileName, // 添加文件名，用于 AI 识别和后续操作
                     files: Object.keys(files),
                     fileContents: files, // 添加文件内容以支持 Sandpack 预览
                     thinking: result.thinking || '', // 添加思考内容
-                    zipFile: fileName,
-                    zipPath: zipPath,
+                    sourcePath: sourceDir, // 源码目录路径
                     model: modelId,
                     usage: result.usage
                 },
@@ -305,16 +430,21 @@ export const CodeGenController = {
 
             const files = result.files;
 
-            // 创建 ZIP 文件
-            const fileName = `codegen-${Date.now()}.zip`;
-            const zipPath = path.join(TMP_DIR, 'codedist', fileName);
-            await fs.ensureDir(path.dirname(zipPath));
+            // 直接保存文件到 .tmp/{chatId}/source 目录（不压缩）
+            const sourceDir = path.join(TMP_DIR, sessionId, 'source');
+            await fs.ensureDir(sourceDir);
 
-            const zip = new AdmZip();
+            // 写入所有文件（覆盖更新）
             for (const [filePath, content] of Object.entries(files)) {
-                zip.addFile(filePath, Buffer.from(content, 'utf-8'));
+                const fullPath = path.join(sourceDir, filePath);
+                await fs.ensureDir(path.dirname(fullPath));
+                await fs.writeFile(fullPath, content, 'utf-8');
             }
-            zip.writeZip(zipPath);
+
+            // 确保必要的配置文件存在
+            await ensureConfigFiles(sourceDir, files);
+
+            console.log(`[CodeGenController] Files updated in ${sourceDir}`);
 
             // 保存 AI 响应
             const aiResponse = `Updated with ${Object.keys(files).length} files`;
@@ -335,23 +465,23 @@ export const CodeGenController = {
                 SET chat_content = ?, update_time = ?
                 WHERE drive_id = ?
             `, aiResponse, Date.now(), chatId);
-
+             // 生成文件名，用于标识这个代码包
+            const fileName = `codegen-${chatId}-${Date.now()}`;
             await db.run(`
-                UPDATE build_record
-                SET file_name = ?, target_path = ?, update_time = ?
-                WHERE drive_id = ?
-            `, fileName, zipPath, Date.now(), chatId);
+                INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
             ctx.body = {
                 success: true,
                 data: {
                     chatId,
                     sessionId,
+                    fileName, // 添加文件名，用于 AI 识别和后续操作
                     files: Object.keys(files),
                     fileContents: files, // 添加文件内容以支持 Sandpack 预览
                     thinking: result.thinking || '', // 添加思考内容
-                    zipFile: fileName,
-                    zipPath: zipPath,
+                    sourcePath: sourceDir, // 源码目录路径
                     model: useModelId,
                     usage: result.usage
                 },
@@ -436,16 +566,21 @@ export const CodeGenController = {
             // 解析完整内容
             const files = aiService._parseCodeResponse.call(aiService, fullContent);
 
-            // 创建 ZIP 文件
-            const fileName = `codegen-${Date.now()}.zip`;
-            const zipPath = path.join(TMP_DIR, 'codedist', fileName);
-            await fs.ensureDir(path.dirname(zipPath));
+            // 直接保存文件到 .tmp/source/{chatId} 目录（不压缩）
+            const sourceDir = path.join(TMP_DIR, chatId, 'source');
+            await fs.ensureDir(sourceDir);
 
-            const zip = new AdmZip();
+            // 写入所有文件
             for (const [filePath, content] of Object.entries(files)) {
-                zip.addFile(filePath, Buffer.from(content, 'utf-8'));
+                const fullPath = path.join(sourceDir, filePath);
+                await fs.ensureDir(path.dirname(fullPath));
+                await fs.writeFile(fullPath, content, 'utf-8');
             }
-            zip.writeZip(zipPath);
+
+            // 确保必要的配置文件存在
+            await ensureConfigFiles(sourceDir, files);
+
+            console.log(`[CodeGenController] Stream files saved to ${sourceDir}`);
 
             // 获取 usage 数据
             const usageData = await streamResult.usage;
@@ -473,7 +608,7 @@ export const CodeGenController = {
             await db.run(`
                 INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, fileName, zipPath, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
+            `, fileName, sourceDir, 1, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
             // 如果有项目 ID，更新项目信息
             if (projectId) {
@@ -484,15 +619,19 @@ export const CodeGenController = {
                 });
             }
 
+            // 生成文件名，用于标识这个代码包
+            const fileName = `codegen-${chatId}-${Date.now()}`;
+
             // 发送完成消息
             ctx.res.write(`data: ${JSON.stringify({
                 type: 'complete',
                 data: {
                     chatId,
                     sessionId,
+                    fileName, // 添加文件名，用于 AI 识别和后续操作
                     files: Object.keys(files),
                     fileContents: files, // 添加文件内容以支持 Sandpack 预览
-                    zipFile: fileName,
+                    sourcePath: sourceDir,
                     usage: usageData,
                     model: modelId
                 }

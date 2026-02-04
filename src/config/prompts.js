@@ -42,9 +42,9 @@ project/
 │   ├── index.tsx         # React 入口文件（必须）
 │   ├── App.tsx           # 主应用组件（必须）
 │   ├── App.css           # 主应用样式（推荐）
-│   ├── logic/            # 游戏/业务逻辑目录
+│   ├── logic/            # 游戏/业务逻辑目录（根据需要）
 │   │   └── gameLogic.ts  # 核心逻辑（根据需要）
-│   ├── services/         # 服务目录
+│   ├── services/         # 服务目录（根据需要）
 │   │   └── aiService.ts  # AI 相关服务（如需要 AI）
 │   └── components/       # 组件目录
 │       └── ...           # 具体组件文件
@@ -61,26 +61,52 @@ project/
 
 ## AI 功能集成
 
-如果项目需要 AI 功能，必须使用 @google/genai：
+如果项目需要 AI 功能，必须严格遵循以下要求：
+1. **必须使用** @google/genai 包（版本 ^1.39.0）
+2. **必须导入** GoogleGenAI 类（不是 GoogleGenerativeAI）
+3. **必须使用** gemini-3-flash-preview 模型
+4. **正确的 API 调用方法**
+5. **必须传入 apiKey 保留process.env.API_KEY**
+
+示例代码片段：
 
 \`\`\`typescript
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenAI, Modality } from "@google/genai";
 
 // 在 services/aiService.ts 中实现
 export class AIService {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenAI;
 
   constructor(apiKey: string) {
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.genAI = new GoogleGenAI({
+      apiKey: process.env.API_KEY || apiKey || ''
+    });
   }
 
-  async generate(prompt: string) {
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+  async generateContent(prompt: string) {
+    try {
+      const response = await this.genAI.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          temperature: 0.8,
+          topP: 0.95,
+        },
+      });
+      return response.text;
+    } catch (error) {
+      console.error('AI generation error:', error);
+      throw error;
+    }
   }
 }
 \`\`\`
+
+**关键要点**：
+- 使用 \`this.genAI.models.generateContent()\` 方法
+- 传入 \`contents\` 参数（不是 content）
+- 确保 apiKey 正确传入，保留process.env.API_KEY
+- 使用指定模型 \`gemini-3-flash-preview\`
 
 ## 样式要求
 

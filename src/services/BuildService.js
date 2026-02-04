@@ -189,6 +189,10 @@ export default defineConfig({
             const { id, file_name, target_path } = task;
 
             let sourcePath = target_path;
+            let sourceDir;
+            let distDir;
+            const deployDir = path.join(TMP_DIR, id);
+
             console.log(`[BuildService] Source path: ${sourcePath}`);
             console.log(`[BuildService] File name: ${file_name}`);
 
@@ -196,60 +200,79 @@ export default defineConfig({
                 throw new Error(`Source file not found: ${sourcePath}`);
             }
 
-            // Verify file is accessible
-            const stats = await fs.stat(sourcePath);
-            console.log(`[BuildService] Source file size: ${stats.size} bytes`);
+            // 判断是新的 codegen 流程（source 目录）还是旧的 zip 流程
+            const isSourceDirectory = sourcePath.includes('/source') && !sourcePath.endsWith('.zip');
 
-            // Prepare temp dir
-            const deployDir = path.join(TMP_DIR, id);
-            const sourceDir = path.join(deployDir, 'source');
-            const distDir = path.join(deployDir, 'dist');
+            if (isSourceDirectory) {
+                // 新流程：直接使用 source 目录，无需解压
+                console.log(`[BuildService] Using existing source directory: ${sourcePath}`);
+                sourceDir = sourcePath;
 
-            console.log(`[BuildService] Deploy dir: ${deployDir}`);
+                // dist 输出到同级的 dist 目录
+                // 例如 .tmp/{chatId}/source -> .tmp/{chatId}/dist
+                const parentDir = path.dirname(sourcePath);
+                distDir = path.join(parentDir, 'dist');
 
-            // Ensure directory exists, remove if exists (with retry for Windows)
-            if (await fs.pathExists(deployDir)) {
-                try {
-                    await fs.remove(deployDir);
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                } catch (err) {
-                    console.warn(`[BuildService] Failed to remove existing dir: ${err.message}`);
-                }
-            }
-            await fs.ensureDir(deployDir);
-
-            // Copy zip to .tmp (with retry for Windows EBUSY errors)
-            const tmpZipPath = path.join(deployDir, file_name);
-            console.log(`[BuildService] Copying from ${sourcePath} to ${tmpZipPath}`);
-            await this.copyFileWithRetry(sourcePath, tmpZipPath);
-            console.log(`[BuildService] Copy completed successfully`);
-    
-            // Unzip (cross-platform)
-            await fs.ensureDir(sourceDir);
-            console.log(`[BuildService] Extracting to ${sourceDir}`);
-
-            try {
-                const zip = new AdmZip(tmpZipPath);
-                zip.extractAllTo(sourceDir, true);
-                console.log(`[BuildService] Extraction completed`);
-
-                // Write .env file after extraction
+                // 确保 .env 文件存在
                 await createEnvFile(sourceDir);
-            } catch (err) {
-                console.error(`[BuildService] Extraction failed:`, err);
-                throw new Error(`Failed to extract zip: ${err.message}`);
-            }
 
-            // Wait for file system to release locks (Windows issue)
-            console.log(`[BuildService] Waiting for file system to release locks...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+                // 旧流程：处理 zip 文件
+                console.log(`[BuildService] Processing zip file`);
 
-            // Delete tmp zip with retry
-            try {
-                await fs.remove(tmpZipPath);
-                console.log(`[BuildService] Temp zip deleted`);
-            } catch (err) {
-                console.warn(`[BuildService] Failed to delete temp zip, continuing anyway: ${err.message}`);
+                // Verify file is accessible
+                const stats = await fs.stat(sourcePath);
+                console.log(`[BuildService] Source file size: ${stats.size} bytes`);
+
+                sourceDir = path.join(deployDir, 'source');
+                distDir = path.join(deployDir, 'dist');
+
+                console.log(`[BuildService] Deploy dir: ${deployDir}`);
+
+                // Ensure directory exists, remove if exists (with retry for Windows)
+                if (await fs.pathExists(deployDir)) {
+                    try {
+                        await fs.remove(deployDir);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (err) {
+                        console.warn(`[BuildService] Failed to remove existing dir: ${err.message}`);
+                    }
+                }
+                await fs.ensureDir(deployDir);
+
+                // Copy zip to .tmp (with retry for Windows EBUSY errors)
+                const tmpZipPath = path.join(deployDir, file_name);
+                console.log(`[BuildService] Copying from ${sourcePath} to ${tmpZipPath}`);
+                await this.copyFileWithRetry(sourcePath, tmpZipPath);
+                console.log(`[BuildService] Copy completed successfully`);
+
+                // Unzip (cross-platform)
+                await fs.ensureDir(sourceDir);
+                console.log(`[BuildService] Extracting to ${sourceDir}`);
+
+                try {
+                    const zip = new AdmZip(tmpZipPath);
+                    zip.extractAllTo(sourceDir, true);
+                    console.log(`[BuildService] Extraction completed`);
+
+                    // Write .env file after extraction
+                    await createEnvFile(sourceDir);
+                } catch (err) {
+                    console.error(`[BuildService] Extraction failed:`, err);
+                    throw new Error(`Failed to extract zip: ${err.message}`);
+                }
+
+                // Wait for file system to release locks (Windows issue)
+                console.log(`[BuildService] Waiting for file system to release locks...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Delete tmp zip with retry
+                try {
+                    await fs.remove(tmpZipPath);
+                    console.log(`[BuildService] Temp zip deleted`);
+                } catch (err) {
+                    console.warn(`[BuildService] Failed to delete temp zip, continuing anyway: ${err.message}`);
+                }
             }
             // Run Build
             const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
@@ -280,6 +303,8 @@ export default defineConfig({
             await new Promise((resolve, reject) => {
                 exec(cmd, { cwd: sourceDir, timeout: 600000 }, (error, stdout, stderr) => {
                     if (error) {
+                        console.error(stdout);
+                        console.error(error);
                         console.error(`[BuildService] Build failed for ${id}`);
                         reject(stderr || error.message);
                     } else {
@@ -292,18 +317,36 @@ export default defineConfig({
             // Wait for build process to fully complete and release locks
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Move dist
-            const possibleDist = path.join(sourceDir, 'dist');
-            if (await fs.pathExists(possibleDist)) {
-                await fs.move(possibleDist, distDir, { overwrite: true });
+            // 处理 dist 目录
+            if (isSourceDirectory) {
+                // 新流程：dist 可能已经在正确位置（vite 配置输出到 ../dist）
+                // 检查 dist 是否在预期位置
+                if (await fs.pathExists(distDir)) {
+                    console.log(`[BuildService] Dist directory found at expected location: ${distDir}`);
+                } else {
+                    // 如果 dist 在 sourceDir 内，移动到上层
+                    const possibleDist = path.join(sourceDir, 'dist');
+                    if (await fs.pathExists(possibleDist)) {
+                        console.log(`[BuildService] Moving dist from ${possibleDist} to ${distDir}`);
+                        await fs.move(possibleDist, distDir, { overwrite: true });
+                    } else {
+                        throw new Error('Build output (dist) not found');
+                    }
+                }
             } else {
-                // Try 'build' folder
-                const possibleBuild = path.join(sourceDir, 'build');
-                if (await fs.pathExists(possibleBuild)) {
-                    await fs.move(possibleBuild, distDir, { overwrite: true });
-                } else if (!await fs.pathExists(distDir)) {
-                    // If distDir doesn't exist (and wasn't created by build script in ../dist), fail
-                    throw new Error('Build output (dist/build) not found');
+                // 旧流程：从 sourceDir/dist 移动到 deployDir/dist
+                const possibleDist = path.join(sourceDir, 'dist');
+                if (await fs.pathExists(possibleDist)) {
+                    await fs.move(possibleDist, distDir, { overwrite: true });
+                } else {
+                    // Try 'build' folder
+                    const possibleBuild = path.join(sourceDir, 'build');
+                    if (await fs.pathExists(possibleBuild)) {
+                        await fs.move(possibleBuild, distDir, { overwrite: true });
+                    } else if (!await fs.pathExists(distDir)) {
+                        // If distDir doesn't exist (and wasn't created by build script in ../dist), fail
+                        throw new Error('Build output (dist/build) not found');
+                    }
                 }
             }
     
