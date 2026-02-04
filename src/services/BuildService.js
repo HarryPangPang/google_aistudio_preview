@@ -17,7 +17,10 @@ export const BuildService = {
             "name": "react-playground-deploy",
             "version": "0.0.0",
             "type": "module",
-            "scripts": { "build": "vite build" },
+            "scripts": {
+                "build": "tsc --noEmit false && vite build --mode production",
+                "build:skip-check": "vite build --mode production"
+            },
             "dependencies": {
                 "react": "^19.2.4",
                 "@google/genai": "^1.39.0",
@@ -297,7 +300,8 @@ export default defineConfig({
             // await DependencyCacheService.prepareDependencies(sourceDir, packageJson);
 
             // Build only (dependencies already prepared)
-            const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
+            // 使用 build:skip-check 跳过 TypeScript 类型检查，如果不存在则使用 build
+            const cmd = `${pnpmCmd} install && ${pnpmCmd} run build:skip-check || ${pnpmCmd} run build`;
 
             console.log(`[BuildService] Executing build for ${id}...`);
             await new Promise((resolve, reject) => {

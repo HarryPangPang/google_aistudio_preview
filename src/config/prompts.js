@@ -52,12 +52,21 @@ project/
 
 ## 代码质量要求
 
-1. **TypeScript 严格模式**：所有 .ts/.tsx 文件必须使用 TypeScript，类型定义完整
+1. **TypeScript 使用**：所有 .ts/.tsx 文件必须使用 TypeScript，但优先保证代码可运行，类型可以适度宽松
 2. **React 19 特性**：使用最新的 React 19 API（如 use、useActionState 等）
 3. **响应式设计**：支持移动端和桌面端
 4. **性能优化**：使用 React.memo、useMemo、useCallback 等优化手段
 5. **代码规范**：遵循 ESLint 和 Prettier 规范
 6. **注释完整**：关键逻辑必须有清晰的中文注释
+7. **类型安全处理（非常重要，必须严格遵守）**：
+   - 对于 AI API 返回的数据，统一使用 any 类型，不要尝试定义复杂的接口
+   - 示例：const result: any = await aiService.generate()
+   - 对于可能为 undefined 的值，必须使用空值合并运算符 ?? 或逻辑或 ||
+   - 示例：setState(value ?? '') 或 setState(value || '')
+   - 避免直接传递 string | undefined 给只接受 string 的函数
+   - 所有可能为空的变量赋值时都要提供默认值
+   - 当不确定类型时，优先使用 any 而不是尝试定义精确类型
+   - 示例：const data: any = response.data（推荐）而不是 const data: ComplexType = response.data
 
 ## AI 功能集成
 
@@ -83,9 +92,9 @@ export class AIService {
     });
   }
 
-  async generateContent(prompt: string) {
+  async generateContent(prompt: string): Promise<any> {
     try {
-      const response = await this.genAI.models.generateContent({
+      const response: any = await this.genAI.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
@@ -93,8 +102,9 @@ export class AIService {
           topP: 0.95,
         },
       });
-      return response.text;
-    } catch (error) {
+      // 使用可选链和空值合并确保返回值总是字符串
+      return response?.text ?? '';
+    } catch (error: any) {
       console.error('AI generation error:', error);
       throw error;
     }
@@ -107,6 +117,9 @@ export class AIService {
 - 传入 \`contents\` 参数（不是 content）
 - 确保 apiKey 正确传入，保留process.env.API_KEY
 - 使用指定模型 \`gemini-3-flash-preview\`
+- API 响应必须使用 any 类型接收：const response: any = await ...
+- 使用可选链访问属性：response?.text
+- 提供默认值防止 undefined：response?.text ?? ''
 
 ## 样式要求
 

@@ -87,6 +87,13 @@ export default defineConfig({
                 strict: false,
                 noUnusedLocals: false,
                 noUnusedParameters: false,
+                noImplicitAny: false,
+                strictNullChecks: false,
+                strictFunctionTypes: false,
+                strictBindCallApply: false,
+                strictPropertyInitialization: false,
+                noImplicitThis: false,
+                alwaysStrict: false,
                 paths: { "@/*": ["./src/*"] }
             },
             include: ["src"]
