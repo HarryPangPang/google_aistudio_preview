@@ -14,35 +14,48 @@ import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT } from '../c
  * AI 模型配置 - 使用 Vercel AI SDK 的统一模型标识
  */
 const MODEL_CONFIG = {
-  // Claude 模型
-  // 'claude-4.5': {
-  //   provider: 'anthropic',
-  //   model: anthropic('claude-sonnet-4-5-20250929'),
-  //   maxTokens: 8192
-  // },
-
-  // Google Gemini 模型
-  // 'gemini-3-pro-preview': {
-  //   provider: 'google',
-  //   model: google('gemini-3-pro-preview'),
-  //   maxTokens: 8192
-  // },
-  'gemini-3-flash-preview': {
+  
+    // Google Gemini 模型 - 通过 prompt 引导思考过程
+      'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
-    maxTokens: 8192
+    maxTokens: 8192,
+    supportsThinking: true // 通过 prompt 引导
   },
 
-  // OpenAI 模型
+  'gemini-3-pro-preview': {
+    provider: 'google',
+    model: google('gemini-3-pro-preview'),
+    maxTokens: 8192,
+    supportsThinking: true // 通过 prompt 引导
+  },
+
+
+  // Claude 模型 - 支持 extended thinking
+  'claude-4.5': {
+    provider: 'anthropic',
+    model: anthropic('claude-sonnet-4-5-20250929'),
+    maxTokens: 8192,
+    supportsThinking: true, // Claude 原生支持 extended thinking
+    thinkingConfig: {
+      // 如果 Anthropic API 支持，可以在这里配置 thinking 相关参数
+      // 目前通过 prompt 引导即可
+    }
+  },
+
+
+  // OpenAI 模型 - 通过 prompt 引导思考过程
   // 'gpt-4o': {
   //   provider: 'openai',
   //   model: openai('gpt-4o'),
-  //   maxTokens: 8192
+  //   maxTokens: 8192,
+  //   supportsThinking: false
   // },
   // 'gpt-4-turbo': {
   //   provider: 'openai',
   //   model: openai('gpt-4-turbo'),
-  //   maxTokens: 8192
+  //   maxTokens: 8192,
+  //   supportsThinking: false
   // }
 };
 
@@ -109,11 +122,24 @@ export class AIService {
 
       console.log(`[AIService] Generated text, tokens used: ${result.usage?.totalTokens || 'unknown'}`);
 
+      // 提取思考内容（如果存在）
+      let thinking = '';
+      let cleanedText = result.text;
+
+      const thinkingMatch = result.text.match(/<thinking>([\s\S]*?)<\/thinking>/);
+      if (thinkingMatch) {
+        thinking = thinkingMatch[1].trim();
+        // 移除思考标签，只保留代码内容
+        cleanedText = result.text.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        console.log('[AIService] Extracted thinking content:', thinking.substring(0, 100) + '...');
+      }
+
       // 解析生成的代码
-      const files = this._parseCodeResponse(result.text);
+      const files = this._parseCodeResponse(cleanedText);
 
       return {
         files,
+        thinking, // 添加思考内容
         usage: result.usage,
         finishReason: result.finishReason
       };
@@ -128,13 +154,20 @@ export class AIService {
    */
   async _generateStream(model, messages, maxTokens) {
     try {
-      const result = await streamText({
+      // 构建请求配置
+      const config = {
         model,
         system: CODE_GENERATION_SYSTEM_PROMPT,
         messages,
         maxTokens,
         temperature: 0.7
-      });
+      };
+
+      // 如果模型支持 extended thinking，可以在这里添加额外配置
+      // 例如对于 Claude: config.thinking = { enabled: true, budget_tokens: 1000 }
+      // 注意：具体参数取决于 Vercel AI SDK 和模型提供商的支持
+
+      const result = streamText(config);
 
       console.log('[AIService] Started streaming response');
 
@@ -308,6 +341,20 @@ export class AIService {
    */
   static isModelAvailable(modelId) {
     return modelId in MODEL_CONFIG;
+  }
+
+  /**
+   * 检查模型是否原生支持思考功能
+   */
+  static supportsThinking(modelId) {
+    return MODEL_CONFIG[modelId]?.supportsThinking || false;
+  }
+
+  /**
+   * 获取模型的思考配置
+   */
+  static getThinkingConfig(modelId) {
+    return MODEL_CONFIG[modelId]?.thinkingConfig || {};
   }
 }
 

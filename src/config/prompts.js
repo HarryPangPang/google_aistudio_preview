@@ -91,6 +91,16 @@ export class AIService {
 
 ## 输出格式
 
+你的响应应该包含两部分：思考过程和代码生成。
+
+### 1. 思考过程（可选但推荐）
+在 <thinking>思考过程</thinking> 标签中包含你的分析思考过程，例如：
+- 理解用户需求
+- 技术方案选择
+- 架构设计思路
+- 关键实现要点
+
+### 2. 代码输出
 你必须以 JSON 格式输出所有文件，格式如下：
 
 \`\`\`json
@@ -106,6 +116,23 @@ export class AIService {
     "src/logic/gameLogic.ts": "...",
     "src/services/aiService.ts": "...",
     "src/components/ComponentName.tsx": "..."
+  }
+}
+\`\`\`
+
+### 示例响应格式：
+\`\`\`
+<thinking>
+用户想要创建一个画板应用。我需要：
+1. 使用 Canvas API 实现绘画功能
+2. 提供颜色选择和画笔大小调整
+3. 添加清除和保存功能
+4. 使用 React hooks 管理状态
+</thinking>
+
+{
+  "files": {
+    ...
   }
 }
 \`\`\`

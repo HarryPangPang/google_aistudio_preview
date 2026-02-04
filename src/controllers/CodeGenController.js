@@ -89,7 +89,7 @@ export const CodeGenController = {
             const formattedHistory = MessageModel.formatForAI(history.slice(0, -1));
 
             // 流式响应 暂时关闭，代码保留
-            if (stream) {
+            if (false) {
                 return await CodeGenController._streamResponse(ctx, {
                     chatId,
                     sessionId,
@@ -168,6 +168,7 @@ export const CodeGenController = {
                     sessionId,
                     files: Object.keys(files),
                     fileContents: files, // 添加文件内容以支持 Sandpack 预览
+                    thinking: result.thinking || '', // 添加思考内容
                     zipFile: fileName,
                     zipPath: zipPath,
                     model: modelId,
@@ -348,6 +349,7 @@ export const CodeGenController = {
                     sessionId,
                     files: Object.keys(files),
                     fileContents: files, // 添加文件内容以支持 Sandpack 预览
+                    thinking: result.thinking || '', // 添加思考内容
                     zipFile: fileName,
                     zipPath: zipPath,
                     model: useModelId,
@@ -397,12 +399,39 @@ export const CodeGenController = {
             );
             console.log('[CodeGenController] Started streaming response', streamResult);
             let fullContent = '';
+            let lastSentThinkingLength = 0;
+            let lastSentCodeLength = 0;
 
-            // 流式发送文本
+            // 流式发送文本，分离思考过程和代码内容
             for await (const chunk of streamResult.stream) {
                 fullContent += chunk;
-                ctx.res.write(`data: ${JSON.stringify({ type: 'text', content: chunk })}\n\n`);
+
+                // 提取思考内容（如果存在 <thinking> 标签）
+                const thinkingMatch = fullContent.match(/<thinking>([\s\S]*?)(?:<\/thinking>)?/);
+                if (thinkingMatch) {
+                    const thinkingText = thinkingMatch[1];
+                    // 只发送新增的思考内容
+                    if (thinkingText.length > lastSentThinkingLength) {
+                        const newThinkingContent = thinkingText.substring(lastSentThinkingLength);
+                        ctx.res.write(`data: ${JSON.stringify({ type: 'thinking', content: newThinkingContent })}\n\n`);
+                        lastSentThinkingLength = thinkingText.length;
+                    }
+                }
+
+                // 提取代码内容（移除思考标签）
+                const codeContent = fullContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').replace(/<thinking>[\s\S]*$/g, '');
+                // 只发送新增的代码内容
+                if (codeContent.length > lastSentCodeLength) {
+                    const newCodeContent = codeContent.substring(lastSentCodeLength);
+                    if (newCodeContent.trim()) {
+                        ctx.res.write(`data: ${JSON.stringify({ type: 'text', content: newCodeContent })}\n\n`);
+                    }
+                    lastSentCodeLength = codeContent.length;
+                }
             }
+
+            // 清理最终内容，移除思考标签
+            fullContent = fullContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
 
             // 解析完整内容
             const files = aiService._parseCodeResponse.call(aiService, fullContent);
