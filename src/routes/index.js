@@ -3,6 +3,7 @@ import { DeployController } from '../controllers/DeployController.js';
 import { PreviewController } from '../controllers/PreviewController.js';
 import { AppController } from '../controllers/AppController.js';
 import { GenerateController } from '../controllers/GenerateController.js';
+import { CodeGenController } from '../controllers/CodeGenController.js';
 import { AuthController } from '../controllers/AuthController.js';
 import { GameController } from '../controllers/GameController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
@@ -48,6 +49,17 @@ router.post('/api/chatmsg', AuthController.authenticate, GenerateController.chat
 router.post('/api/download', AuthController.authenticate, GenerateController.downloadcode);
 router.post('/api/deploywithcode', AuthController.authenticate, GenerateController.deploywithcode);
 router.post('/api/buildcode', AuthController.authenticate, GenerateController.buildCode);
+
+
+// ==================== 新架构：CodeGen API（使用 Vercel AI SDK）====================
+// 代码生成相关 - 全新架构，支持流式响应和多模型
+router.post('/api/codegen/init', AuthController.authenticate, CodeGenController.init);
+router.post('/api/codegen/chat', AuthController.authenticate, CodeGenController.chat);
+router.get('/api/codegen/models', AuthController.authenticate, CodeGenController.getModels);
+router.get('/api/codegen/chats', AuthController.authenticate, CodeGenController.getUserChats);
+router.get('/api/codegen/history', AuthController.authenticate, CodeGenController.getHistory);
+router.get('/api/codegen/stats', AuthController.authenticate, CodeGenController.getStats);
+router.delete('/api/codegen/chat/:chatId', AuthController.authenticate, CodeGenController.deleteChat);
 
 // Game Statistics Routes - 游戏统计
 router.post('/api/game/track', AuthController.authenticate, GameController.trackClick);

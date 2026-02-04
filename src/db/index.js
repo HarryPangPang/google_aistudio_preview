@@ -106,6 +106,25 @@ export const getDb = async () => {
         CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
         CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
         CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at);
+
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id TEXT NOT NULL,
+            project_id TEXT,
+            user_id INTEGER,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            model_id TEXT,
+            tokens_used INTEGER,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_project_id ON messages(project_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     `);
     // keep this,Init tables
     // await dbInstance.exec(`

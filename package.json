@@ -8,11 +8,14 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.8",
+    "@ai-sdk/google": "^1.0.11",
+    "@ai-sdk/openai": "^1.0.9",
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",
     "@anthropic-ai/claude-code": "^2.1.29",
-    "@anthropic-ai/sdk": "^0.72.1",
     "@koa/cors": "^5.0.0",
     "adm-zip": "^0.5.16",
+    "ai": "^4.1.12",
     "axios": "^1.6.0",
     "bcrypt": "^6.0.0",
     "formidable": "^3.5.1",
@@ -28,7 +31,8 @@
     "pnpm": "^10.28.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
