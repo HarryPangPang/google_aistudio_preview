@@ -15,13 +15,18 @@ import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT } from '../c
  */
 const MODEL_CONFIG = {
   // Claude 模型
-  'claude-4.5': {
-    provider: 'anthropic',
-    model: anthropic('claude-sonnet-4-5-20250929'),
-    maxTokens: 8192
-  },
+  // 'claude-4.5': {
+  //   provider: 'anthropic',
+  //   model: anthropic('claude-sonnet-4-5-20250929'),
+  //   maxTokens: 8192
+  // },
 
   // Google Gemini 模型
+  // 'gemini-3-pro-preview': {
+  //   provider: 'google',
+  //   model: google('gemini-3-pro-preview'),
+  //   maxTokens: 8192
+  // },
   'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),

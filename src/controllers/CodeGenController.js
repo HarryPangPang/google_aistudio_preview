@@ -89,7 +89,7 @@ export const CodeGenController = {
             const formattedHistory = MessageModel.formatForAI(history.slice(0, -1));
 
             // 流式响应 暂时关闭，代码保留
-            if (false) {
+            if (stream) {
                 return await CodeGenController._streamResponse(ctx, {
                     chatId,
                     sessionId,
@@ -167,6 +167,7 @@ export const CodeGenController = {
                     chatId,
                     sessionId,
                     files: Object.keys(files),
+                    fileContents: files, // 添加文件内容以支持 Sandpack 预览
                     zipFile: fileName,
                     zipPath: zipPath,
                     model: modelId,
@@ -346,6 +347,7 @@ export const CodeGenController = {
                     chatId,
                     sessionId,
                     files: Object.keys(files),
+                    fileContents: files, // 添加文件内容以支持 Sandpack 预览
                     zipFile: fileName,
                     zipPath: zipPath,
                     model: useModelId,
@@ -460,6 +462,7 @@ export const CodeGenController = {
                     chatId,
                     sessionId,
                     files: Object.keys(files),
+                    fileContents: files, // 添加文件内容以支持 Sandpack 预览
                     zipFile: fileName,
                     usage: usageData,
                     model: modelId

@@ -117,7 +117,9 @@ export class AIService {
 - 代码必须可以直接运行，无需修改
 - 生成的项目必须完整，包含所有必需的配置文件
 - 遵循 React 和 TypeScript 最佳实践
-- 所有的html标签内部不允许出现>>或者《〈
+- 所有的html标签内部不允许出现>>或者<<符号，否则会导致前端渲染错误
+- 如果无法生成符合要求的代码，直接跳过
+- 切记：严格按照上述要求生成代码
 `;
 
 export const CODE_GENERATION_USER_PROMPT = (userInput, currentPage = null) => {
