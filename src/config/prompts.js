@@ -12,6 +12,15 @@ export const CODE_GENERATION_SYSTEM_PROMPT = `你是一个专业的前端代码�
 ### package.json 依赖配置
 \`\`\`json
 {
+  "name": "名称自动生成", 
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
