@@ -38,133 +38,27 @@ async function ensureConfigFiles(sourceDir, files) {
         );
     }
 
-    // 检查并添加 vite.config.ts（如果不存在）
+    // 检查并添加 vite.config.js（如果不存在）
     if (!fileList.some(f => f.includes('vite.config'))) {
-        console.log('[CodeGenController] Adding default vite.config.ts');
+        console.log('[CodeGenController] Adding default vite.config.js');
         const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 export default defineConfig({
-  plugins: [
-    react({
-      // 禁用 babel 插件，加速构建
-      babel: {
-        // 忽略所有警告
-        parserOpts: {
-          errorRecovery: true
-        }
-      }
-    })
-  ],
+  plugins: [react()],
   base: './',
-  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    // 禁用 TypeScript 检查
     target: 'esnext',
-    minify: 'esbuild',
-    rollupOptions: {
-      onwarn(warning, warn) {
-        // 忽略所有警告
-        return;
-      }
-    }
+    minify: 'esbuild'
   },
-  esbuild: {
-    // 完全忽略 TypeScript 类型检查错误
-    logOverride: {
-      'this-is-undefined-in-esm': 'silent'
-    },
-    // 不输出类型检查错误
-    tsconfigRaw: {
-      compilerOptions: {
-        skipLibCheck: true,
-        noUnusedLocals: false,
-        noUnusedParameters: false,
-        noImplicitAny: false
-      }
-    }
-  },
-  // 禁用所有警告
   logLevel: 'error'
 });`;
-        await fs.writeFile(path.join(sourceDir, 'vite.config.ts'), viteConfig);
+        await fs.writeFile(path.join(sourceDir, 'vite.config.js'), viteConfig);
     }
 
-    // 检查并添加 tsconfig.json（如果不存在）
-    if (!fileList.some(f => f === 'tsconfig.json' || f.endsWith('/tsconfig.json'))) {
-        console.log('[CodeGenController] Adding default tsconfig.json');
-        const tsConfig = {
-            compilerOptions: {
-                target: "ES2020",
-                useDefineForClassFields: true,
-                lib: ["ES2020", "DOM", "DOM.Iterable"],
-                module: "ESNext",
-                skipLibCheck: true,
-                moduleResolution: "bundler",
-                allowImportingTsExtensions: true,
-                resolveJsonModule: true,
-                isolatedModules: true,
-                noEmit: true,
-                jsx: "react-jsx",
-                strict: false,
-                noUnusedLocals: false,
-                noUnusedParameters: false,
-                noImplicitAny: false,
-                strictNullChecks: false,
-                strictFunctionTypes: false,
-                strictBindCallApply: false,
-                strictPropertyInitialization: false,
-                noImplicitThis: false,
-                alwaysStrict: false,
-                paths: { "@/*": ["./src/*"] },
-                types: ["vite/client"]
-            },
-            include: ["src"]
-        };
-        await fs.writeFile(
-            path.join(sourceDir, 'tsconfig.json'),
-            JSON.stringify(tsConfig, null, 2)
-        );
-    }
-
-    // 检查并添加 tsconfig.node.json（如果不存在）
-    if (!fileList.some(f => f.includes('tsconfig.node'))) {
-        console.log('[CodeGenController] Adding default tsconfig.node.json');
-        const tsConfigNode = {
-            compilerOptions: {
-                composite: true,
-                skipLibCheck: true,
-                module: "ESNext",
-                moduleResolution: "bundler",
-                allowSyntheticDefaultImports: true
-            },
-            include: ["vite.config.ts"]
-        };
-        await fs.writeFile(
-            path.join(sourceDir, 'tsconfig.node.json'),
-            JSON.stringify(tsConfigNode, null, 2)
-        );
-    }
-
-    // 检查并添加 vite-env.d.ts（如果不存在）- Vite 环境变量类型声明
-    if (!fileList.some(f => f === 'vite-env.d.ts' || f === 'src/vite-env.d.ts' || f.endsWith('/vite-env.d.ts'))) {
-        console.log('[CodeGenController] Adding default vite-env.d.ts');
-        const viteEnvDts = `/// <reference types="vite/client" />
-
-interface ImportMetaEnv {
-  readonly VITE_APP_TITLE: string
-  // 更多环境变量...
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}
-`;
-        await fs.writeFile(path.join(sourceDir, 'src', 'vite-env.d.ts'), viteEnvDts);
-    }
+    // TypeScript 配置文件已移除，使用纯 JavaScript
 
     // 检查并添加 index.html（如果不存在）
     if (!fileList.some(f => f === 'index.html' || f.endsWith('/index.html'))) {
@@ -179,37 +73,38 @@ interface ImportMeta {
 </head>
 <body>
     <div id="root"></div>
-    <script type="module" src="/src/index.tsx"></script>
+    <script type="module" src="/src/index.jsx"></script>
 </body>
 </html>`;
         await fs.writeFile(path.join(sourceDir, 'index.html'), indexHtml);
     }
 
-    // 检查并添加 src/index.tsx（如果不存在）- 这是必需的入口文件
-    if (!fileList.some(f => f === 'src/index.tsx' || f.endsWith('/index.tsx'))) {
-        console.log('[CodeGenController] Adding default src/index.tsx');
-        const indexTsx = `import React from 'react';
-import ReactDOM from 'react-dom/client';
+    // 检查并添加 src/index.jsx（如果不存在）- 这是必需的入口文件
+    if (!fileList.some(f => f === 'src/index.jsx' || f.endsWith('/index.jsx'))) {
+        console.log('[CodeGenController] Adding default src/index.jsx');
+        const indexJsx = `import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import './App.css';
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-root.render(
-  <React.StrictMode>
+const root = document.getElementById('root');
+if (!root) throw new Error('Root element not found');
+
+createRoot(root).render(
+  <StrictMode>
     <App />
-  </React.StrictMode>
+  </StrictMode>
 );
 `;
-        const indexTsxPath = path.join(sourceDir, 'src', 'index.tsx');
-        await fs.ensureDir(path.dirname(indexTsxPath));
-        await fs.writeFile(indexTsxPath, indexTsx);
+        const indexJsxPath = path.join(sourceDir, 'src', 'index.jsx');
+        await fs.ensureDir(path.dirname(indexJsxPath));
+        await fs.writeFile(indexJsxPath, indexJsx);
     }
 
-    // 检查并添加 src/App.tsx（如果不存在）- 这是必需的主组件
-    if (!fileList.some(f => f === 'src/App.tsx' || f.endsWith('/App.tsx'))) {
-        console.log('[CodeGenController] Adding default src/App.tsx');
-        const appTsx = `import React from 'react';
-import './App.css';
+    // 检查并添加 src/App.jsx（如果不存在）- 这是必需的主组件
+    if (!fileList.some(f => f === 'src/App.jsx' || f.endsWith('/App.jsx'))) {
+        console.log('[CodeGenController] Adding default src/App.jsx');
+        const appJsx = `import './App.css';
 
 function App() {
   return (
@@ -222,9 +117,9 @@ function App() {
 
 export default App;
 `;
-        const appTsxPath = path.join(sourceDir, 'src', 'App.tsx');
-        await fs.ensureDir(path.dirname(appTsxPath));
-        await fs.writeFile(appTsxPath, appTsx);
+        const appJsxPath = path.join(sourceDir, 'src', 'App.jsx');
+        await fs.ensureDir(path.dirname(appJsxPath));
+        await fs.writeFile(appJsxPath, appJsx);
     }
 
     // 检查并添加 App.css（如果不存在）- 这是必需的文件
