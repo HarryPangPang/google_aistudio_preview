@@ -16,7 +16,7 @@ import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT } from '../c
 const MODEL_CONFIG = {
   
     // Google Gemini 模型 - 通过 prompt 引导思考过程
-      'gemini-3-flash-preview': {
+  'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
     maxTokens: 8192,

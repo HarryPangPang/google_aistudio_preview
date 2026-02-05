@@ -211,9 +211,9 @@ export const CodeGenController = {
             const history = await MessageModel.getRecentMessages(chatId, 20);
             const formattedHistory = MessageModel.formatForAI(history.slice(0, -1));
 
-            // 流式响应 暂时关闭，代码保留
-            if (false) {
-                return await CodeGenController._streamResponse(ctx, {
+            // 流式响应
+            if (stream) {
+                await CodeGenController._streamResponse(ctx, {
                     chatId,
                     sessionId,
                     modelId,
@@ -223,6 +223,7 @@ export const CodeGenController = {
                     projectId,
                     user
                 });
+                return; // 重要：在流式响应后直接返回，不要继续执行
             }
 
             // 非流式响应
@@ -415,7 +416,7 @@ export const CodeGenController = {
 
             // 流式响应
             if (stream) {
-                return await CodeGenController._streamResponse(ctx, {
+                await CodeGenController._streamResponse(ctx, {
                     chatId,
                     sessionId,
                     modelId: useModelId,
@@ -425,6 +426,7 @@ export const CodeGenController = {
                     projectId,
                     user
                 });
+                return; // 重要：在流式响应后直接返回，不要继续执行
             }
 
             // 非流式响应
@@ -516,16 +518,21 @@ export const CodeGenController = {
             ctx.set({
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'Content-Type': 'text/event-stream'
+                'Content-Type': 'text/event-stream',
+                'X-Accel-Buffering': 'no' // 禁用 Nginx 缓冲
             });
+            ctx.status = 200;
 
-            // 发送初始化消息
+            // 发送初始化消息并立即刷新
             ctx.res.write(`data: ${JSON.stringify({
                 type: 'init',
                 chatId,
                 sessionId,
                 model: modelId
             })}\n\n`);
+
+            // 强制刷新缓冲区
+            if (ctx.res.flush) ctx.res.flush();
 
             // 获取流式响应
             const streamResult = await aiService.generateCode(
@@ -535,7 +542,9 @@ export const CodeGenController = {
                 currentPage,
                 true
             );
-            console.log('[CodeGenController] Started streaming response', streamResult);
+
+            console.log('[CodeGenController] Started streaming response');
+
             let fullContent = '';
             let lastSentThinkingLength = 0;
             let lastSentCodeLength = 0;
@@ -552,6 +561,7 @@ export const CodeGenController = {
                     if (thinkingText.length > lastSentThinkingLength) {
                         const newThinkingContent = thinkingText.substring(lastSentThinkingLength);
                         ctx.res.write(`data: ${JSON.stringify({ type: 'thinking', content: newThinkingContent })}\n\n`);
+                        if (ctx.res.flush) ctx.res.flush(); // 立即刷新
                         lastSentThinkingLength = thinkingText.length;
                     }
                 }
@@ -563,6 +573,7 @@ export const CodeGenController = {
                     const newCodeContent = codeContent.substring(lastSentCodeLength);
                     if (newCodeContent.trim()) {
                         ctx.res.write(`data: ${JSON.stringify({ type: 'text', content: newCodeContent })}\n\n`);
+                        if (ctx.res.flush) ctx.res.flush(); // 立即刷新
                     }
                     lastSentCodeLength = codeContent.length;
                 }
@@ -571,11 +582,13 @@ export const CodeGenController = {
             // 清理最终内容，移除思考标签
             fullContent = fullContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
 
+            console.log('[CodeGenController] Stream complete, processing files...');
+
             // 解析完整内容
             const files = aiService._parseCodeResponse.call(aiService, fullContent);
 
-            // 直接保存文件到 .tmp/source/{chatId} 目录（不压缩）
-            const sourceDir = path.join(TMP_DIR, chatId, 'source');
+            // 直接保存文件到 .tmp/{sessionId}/source 目录（不压缩）
+            const sourceDir = path.join(TMP_DIR, sessionId, 'source');
             await fs.ensureDir(sourceDir);
 
             // 写入所有文件
@@ -592,6 +605,9 @@ export const CodeGenController = {
 
             // 获取 usage 数据
             const usageData = await streamResult.usage;
+
+            // 生成文件名，用于标识这个代码包
+            const fileName = `codegen-${chatId}-${Date.now()}`;
 
             // 保存 AI 响应消息
             await MessageModel.create({
@@ -613,10 +629,11 @@ export const CodeGenController = {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `, chatId, sessionId, aiResponse, Date.now(), Date.now(), user?.id || null, user?.username || user?.email || null);
 
+            // 记录构建信息，is_processed = 0 表示待构建
             await db.run(`
                 INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, fileName, sourceDir, 1, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
+            `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
             // 如果有项目 ID，更新项目信息
             if (projectId) {
@@ -627,29 +644,28 @@ export const CodeGenController = {
                 });
             }
 
-            // 生成文件名，用于标识这个代码包
-            const fileName = `codegen-${chatId}-${Date.now()}`;
-
             // 发送完成消息
             ctx.res.write(`data: ${JSON.stringify({
                 type: 'complete',
                 data: {
                     chatId,
                     sessionId,
-                    fileName, // 添加文件名，用于 AI 识别和后续操作
+                    fileName,
                     files: Object.keys(files),
-                    fileContents: files, // 添加文件内容以支持 Sandpack 预览
+                    fileContents: files,
                     sourcePath: sourceDir,
                     usage: usageData,
                     model: modelId
                 }
             })}\n\n`);
 
+            if (ctx.res.flush) ctx.res.flush();
             ctx.res.end();
 
         } catch (error) {
             console.error('[CodeGenController] Stream error:', error);
             ctx.res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+            if (ctx.res.flush) ctx.res.flush();
             ctx.res.end();
         }
     },
