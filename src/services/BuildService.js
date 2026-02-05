@@ -204,7 +204,8 @@ export default defineConfig({
             }
 
             // 判断是新的 codegen 流程（source 目录）还是旧的 zip 流程
-            const isSourceDirectory = sourcePath.includes('/source') && !sourcePath.endsWith('.zip');
+            // 兼容 Windows 和 Unix 路径分隔符
+            const isSourceDirectory = /[/\\]source/.test(sourcePath) && !sourcePath.endsWith('.zip');
 
             if (isSourceDirectory) {
                 // 新流程：直接使用 source 目录，无需解压
