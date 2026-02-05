@@ -141,6 +141,43 @@ export default defineConfig({
 </html>`;
         await fs.writeFile(path.join(sourceDir, 'index.html'), indexHtml);
     }
+
+    // 检查并添加 App.css（如果不存在）- 这是必需的文件
+    if (!fileList.some(f => f === 'src/App.css' || f.endsWith('/App.css'))) {
+        console.log('[CodeGenController] Adding default App.css');
+        const appCss = `/* App.css - 主应用样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+.app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+`;
+        const appCssPath = path.join(sourceDir, 'src', 'App.css');
+        await fs.ensureDir(path.dirname(appCssPath));
+        await fs.writeFile(appCssPath, appCss);
+    }
 }
 
 export const CodeGenController = {

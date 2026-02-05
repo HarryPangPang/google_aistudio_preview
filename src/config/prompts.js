@@ -50,7 +50,7 @@ project/
 ├── src/
 │   ├── index.tsx         # React 入口文件（必须）
 │   ├── App.tsx           # 主应用组件（必须）
-│   ├── App.css           # 主应用样式（推荐）
+│   ├── App.css           # 主应用样式（必须）
 │   ├── logic/            # 游戏/业务逻辑目录（根据需要）
 │   │   └── gameLogic.ts  # 核心逻辑（根据需要）
 │   ├── services/         # 服务目录（根据需要）
@@ -244,7 +244,7 @@ project/
 ├── src/
 │   ├── index.tsx         # React 入口文件（必须）
 │   ├── App.tsx           # 主应用组件（必须）
-│   ├── App.css           # 主应用样式（推荐）
+│   ├── App.css           # 主应用样式（必须）
 │   ├── logic/            # 游戏/业务逻辑目录（根据需要）
 │   │   └── gameLogic.ts  # 核心逻辑（根据需要）
 │   ├── services/         # 服务目录（根据需要）
