@@ -271,10 +271,11 @@ export const CodeGenController = {
 
             // 保存到数据库
             const db = await getDb();
+            // uuid是最近一次构建的id
             await db.run(`
                 INSERT INTO chat_record (drive_id, uuid, chat_content, create_time, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?)
-            `, chatId, sessionId, files, Date.now(), user?.id || null, user?.username || user?.email || null);
+            `, chatId, sessionId, JSON.stringify(files), Date.now(), user?.id || null, user?.username || user?.email || null);
 
             // 记录构建信息，target_path 改为 source 目录
             await db.run(`
