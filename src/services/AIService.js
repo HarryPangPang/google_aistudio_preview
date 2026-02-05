@@ -8,7 +8,7 @@ import { streamText, generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
-import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT } from '../config/prompts.js';
+import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERATION_SYSTEM_PROMPT_STREAM } from '../config/prompts.js';
 
 /**
  * AI 模型配置 - 使用 Vercel AI SDK 的统一模型标识
@@ -20,14 +20,20 @@ const MODEL_CONFIG = {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
     maxTokens: 8192,
-    supportsThinking: true // 通过 prompt 引导
+    supportsThinking: true, // 通过 prompt 引导
+     thinkingConfig: {
+        includeThoughts: true,
+      },
   },
 
   'gemini-3-pro-preview': {
     provider: 'google',
     model: google('gemini-3-pro-preview'),
     maxTokens: 8192,
-    supportsThinking: true // 通过 prompt 引导
+    supportsThinking: true, // 通过 prompt 引导
+    thinkingConfig: {
+        includeThoughts: true,
+      },
   },
 
 
@@ -158,7 +164,7 @@ export class AIService {
       // 构建请求配置
       const config = {
         model,
-        system: CODE_GENERATION_SYSTEM_PROMPT,
+        system: CODE_GENERATION_SYSTEM_PROMPT_STREAM,
         messages,
         maxTokens,
         temperature: 0.7

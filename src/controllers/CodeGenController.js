@@ -255,8 +255,20 @@ export const CodeGenController = {
             await ensureConfigFiles(sourceDir, files);
 
             console.log(`[CodeGenController] Files saved to ${sourceDir}`);
-                        // 生成文件名，用于标识这个代码包
-            const fileName = `codegen-${chatId}-${Date.now()}`;
+
+            // 生成文件名，从 package.json 的 name 字段提取
+            let fileName = `codegen-${chatId}-${Date.now()}`;
+            try {
+                const packageJsonContent = files['package.json'];
+                if (packageJsonContent) {
+                    const packageJson = JSON.parse(packageJsonContent);
+                    if (packageJson.name) {
+                        fileName = packageJson.name;
+                    }
+                }
+            } catch (error) {
+                console.warn('[CodeGenController] Failed to extract name from package.json:', error);
+            }
 
             // 保存 AI 响应消息
             const aiResponse = `Generated ${Object.keys(files).length} files`;
@@ -475,8 +487,21 @@ export const CodeGenController = {
                 SET chat_content = ?, update_time = ?
                 WHERE drive_id = ?
             `, aiResponse, Date.now(), chatId);
-             // 生成文件名，用于标识这个代码包
-            const fileName = `codegen-${chatId}-${Date.now()}`;
+
+            // 生成文件名，从 package.json 的 name 字段提取
+            let fileName = `codegen-${chatId}-${Date.now()}`;
+            try {
+                const packageJsonContent = files['package.json'];
+                if (packageJsonContent) {
+                    const packageJson = JSON.parse(packageJsonContent);
+                    if (packageJson.name) {
+                        fileName = packageJson.name;
+                    }
+                }
+            } catch (error) {
+                console.warn('[CodeGenController] Failed to extract name from package.json:', error);
+            }
+
             await db.run(`
                 INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -510,6 +535,7 @@ export const CodeGenController = {
 
     /**
      * 处理流式响应（内部方法）
+     * 新格式：解析 {"type":"think","content":"..."} 和 {"type":"code","content":"\"file.json\": \"...\""}
      */
     async _streamResponse(ctx, { chatId, sessionId, modelId, prompt, formattedHistory, currentPage, projectId, user }) {
         try {
@@ -546,46 +572,105 @@ export const CodeGenController = {
             console.log('[CodeGenController] Started streaming response');
 
             let fullContent = '';
-            let lastSentThinkingLength = 0;
-            let lastSentCodeLength = 0;
+            let buffer = ''; // 用于累积不完整的 JSON 对象
+            const files = {}; // 存储解析出的文件
 
-            // 流式发送文本，分离思考过程和代码内容
+            // 流式发送文本，解析 JSON 格式的思考和代码
             for await (const chunk of streamResult.stream) {
                 fullContent += chunk;
+                buffer += chunk;
 
-                // 提取思考内容（如果存在 <thinking> 标签）
-                const thinkingMatch = fullContent.match(/<thinking>([\s\S]*?)(?:<\/thinking>)?/);
-                if (thinkingMatch) {
-                    const thinkingText = thinkingMatch[1];
-                    // 只发送新增的思考内容
-                    if (thinkingText.length > lastSentThinkingLength) {
-                        const newThinkingContent = thinkingText.substring(lastSentThinkingLength);
-                        ctx.res.write(`data: ${JSON.stringify({ type: 'thinking', content: newThinkingContent })}\n\n`);
-                        if (ctx.res.flush) ctx.res.flush(); // 立即刷新
-                        lastSentThinkingLength = thinkingText.length;
-                    }
-                }
+                // 尝试从 buffer 中提取完整的 JSON 对象
+                const lines = buffer.split('\n');
 
-                // 提取代码内容（移除思考标签）
-                const codeContent = fullContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').replace(/<thinking>[\s\S]*$/g, '');
-                // 只发送新增的代码内容
-                if (codeContent.length > lastSentCodeLength) {
-                    const newCodeContent = codeContent.substring(lastSentCodeLength);
-                    if (newCodeContent.trim()) {
-                        ctx.res.write(`data: ${JSON.stringify({ type: 'text', content: newCodeContent })}\n\n`);
-                        if (ctx.res.flush) ctx.res.flush(); // 立即刷新
+                // 保留最后一行（可能不完整）
+                buffer = lines.pop() || '';
+
+                // 处理每一行
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) continue;
+
+                    try {
+                        // 尝试解析 JSON 对象
+                        const parsed = JSON.parse(trimmedLine);
+
+                        if (parsed.type === 'think') {
+                            // 发送思考内容（前端只显示这个）
+                            ctx.res.write(`data: ${JSON.stringify({
+                                type: 'think',
+                                content: parsed.content
+                            })}\n\n`);
+                            if (ctx.res.flush) ctx.res.flush();
+
+                        } else if (parsed.type === 'code') {
+                            // 解析代码文件 格式: "filename": "content"
+                            const codeMatch = parsed.content.match(/"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/);
+                            if (codeMatch) {
+                                const fileName = codeMatch[1];
+                                const fileContent = codeMatch[2]
+                                    .replace(/\\n/g, '\n')
+                                    .replace(/\\t/g, '\t')
+                                    .replace(/\\"/g, '"')
+                                    .replace(/\\\\/g, '\\');
+
+                                files[fileName] = fileContent;
+
+                                // 发送代码片段通知（前端不显示，但可以用于进度跟踪）
+                                ctx.res.write(`data: ${JSON.stringify({
+                                    type: 'code',
+                                    fileName,
+                                    progress: Object.keys(files).length
+                                })}\n\n`);
+                                if (ctx.res.flush) ctx.res.flush();
+                            }
+                        }
+                    } catch (parseError) {
+                        // 如果解析失败，可能是不完整的 JSON，将其加回 buffer
+                        console.warn('[CodeGenController] Failed to parse line:', trimmedLine.substring(0, 100));
                     }
-                    lastSentCodeLength = codeContent.length;
                 }
             }
 
-            // 清理最终内容，移除思考标签
-            fullContent = fullContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+            // 处理剩余的 buffer
+            if (buffer.trim()) {
+                try {
+                    const parsed = JSON.parse(buffer.trim());
+                    if (parsed.type === 'think') {
+                        ctx.res.write(`data: ${JSON.stringify({
+                            type: 'think',
+                            content: parsed.content
+                        })}\n\n`);
+                    } else if (parsed.type === 'code') {
+                        const codeMatch = parsed.content.match(/"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/);
+                        if (codeMatch) {
+                            const fileName = codeMatch[1];
+                            const fileContent = codeMatch[2]
+                                .replace(/\\n/g, '\n')
+                                .replace(/\\t/g, '\t')
+                                .replace(/\\"/g, '"')
+                                .replace(/\\\\/g, '\\');
+                            files[fileName] = fileContent;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[CodeGenController] Failed to parse remaining buffer');
+                }
+            }
 
             console.log('[CodeGenController] Stream complete, processing files...');
+            console.log(`[CodeGenController] Parsed ${Object.keys(files).length} files:`, Object.keys(files).join(', '));
 
-            // 解析完整内容
-            const files = aiService._parseCodeResponse.call(aiService, fullContent);
+            // 如果没有解析到文件，尝试使用原有的解析方法作为后备
+            if (Object.keys(files).length === 0) {
+                console.log('[CodeGenController] No files parsed from stream format, trying fallback parser...');
+                try {
+                    const fallbackFiles = aiService._parseCodeResponse.call(aiService, fullContent);
+                    Object.assign(files, fallbackFiles);
+                } catch (error) {
+                    console.error('[CodeGenController] Fallback parser also failed:', error);
+                }
+            }
 
             // 直接保存文件到 .tmp/{sessionId}/source 目录（不压缩）
             const sourceDir = path.join(TMP_DIR, sessionId, 'source');
@@ -606,8 +691,19 @@ export const CodeGenController = {
             // 获取 usage 数据
             const usageData = await streamResult.usage;
 
-            // 生成文件名，用于标识这个代码包
-            const fileName = `codegen-${chatId}-${Date.now()}`;
+            // 生成文件名，从 package.json 的 name 字段提取
+            let fileName = `codegen-${chatId}-${Date.now()}`;
+            try {
+                const packageJsonContent = files['package.json'];
+                if (packageJsonContent) {
+                    const packageJson = JSON.parse(packageJsonContent);
+                    if (packageJson.name) {
+                        fileName = packageJson.name;
+                    }
+                }
+            } catch (error) {
+                console.warn('[CodeGenController] Failed to extract name from package.json:', error);
+            }
 
             // 保存 AI 响应消息
             await MessageModel.create({
@@ -615,7 +711,7 @@ export const CodeGenController = {
                 project_id: projectId,
                 user_id: user?.id || null,
                 role: 'assistant',
-                content: fullContent,
+                content: `Generated ${Object.keys(files).length} files`,
                 model_id: modelId,
                 tokens_used: usageData?.totalTokens
             });
