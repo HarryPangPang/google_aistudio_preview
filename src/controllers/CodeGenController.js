@@ -142,6 +142,48 @@ export default defineConfig({
         await fs.writeFile(path.join(sourceDir, 'index.html'), indexHtml);
     }
 
+    // 检查并添加 src/index.tsx（如果不存在）- 这是必需的入口文件
+    if (!fileList.some(f => f === 'src/index.tsx' || f.endsWith('/index.tsx'))) {
+        console.log('[CodeGenController] Adding default src/index.tsx');
+        const indexTsx = `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './App.css';
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`;
+        const indexTsxPath = path.join(sourceDir, 'src', 'index.tsx');
+        await fs.ensureDir(path.dirname(indexTsxPath));
+        await fs.writeFile(indexTsxPath, indexTsx);
+    }
+
+    // 检查并添加 src/App.tsx（如果不存在）- 这是必需的主组件
+    if (!fileList.some(f => f === 'src/App.tsx' || f.endsWith('/App.tsx'))) {
+        console.log('[CodeGenController] Adding default src/App.tsx');
+        const appTsx = `import React from 'react';
+import './App.css';
+
+function App() {
+  return (
+    <div className="app">
+      <h1>Welcome to Your App</h1>
+      <p>Start building your application here.</p>
+    </div>
+  );
+}
+
+export default App;
+`;
+        const appTsxPath = path.join(sourceDir, 'src', 'App.tsx');
+        await fs.ensureDir(path.dirname(appTsxPath));
+        await fs.writeFile(appTsxPath, appTsx);
+    }
+
     // 检查并添加 App.css（如果不存在）- 这是必需的文件
     if (!fileList.some(f => f === 'src/App.css' || f.endsWith('/App.css'))) {
         console.log('[CodeGenController] Adding default App.css');
