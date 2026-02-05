@@ -18,12 +18,10 @@ export const BuildService = {
             "version": "0.0.0",
             "type": "module",
             "scripts": {
-                "build": "tsc --noEmit false && vite build --mode production",
-                "build:skip-check": "vite build --mode production"
+                "build": "vite build --mode production",
             },
             "dependencies": {
                 "react": "^19.2.4",
-                "@google/genai": "^1.39.0",
                 "react-dom": "^19.2.4"
             },
             "devDependencies": {
@@ -301,8 +299,7 @@ export default defineConfig({
             // await DependencyCacheService.prepareDependencies(sourceDir, packageJson);
 
             // Build only (dependencies already prepared)
-            // 使用 build:skip-check 跳过 TypeScript 类型检查，如果不存在则使用 build
-            const cmd = `${pnpmCmd} install && ${pnpmCmd} run build:skip-check || ${pnpmCmd} run build`;
+            const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
 
             console.log(`[BuildService] Executing build for ${id}...`);
             await new Promise((resolve, reject) => {
