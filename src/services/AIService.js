@@ -68,10 +68,18 @@ const MODEL_CONFIG = {
       },
     },
   },
-  // 备用：Claude 3.5 Sonnet，兼容性更好
-  'claude-sonnet-4-20250514': {
+   // 备用：Claude 3.5 Sonnet，兼容性更好
+   'claude-opus-4-5': {
     provider: 'anthropic',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: anthropic('claude-opus-4-5'),
+    providerOptions: {
+      anthropic: {},
+    },
+  },
+  // 备用：Claude 3.5 Sonnet，兼容性更好
+  'claude-sonnet-4-5': {
+    provider: 'anthropic',
+    model: anthropic('claude-sonnet-4-5'),
     providerOptions: {
       anthropic: {},
     },
