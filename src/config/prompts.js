@@ -43,6 +43,25 @@ export const CODE_GENERATION_SYSTEM_PROMPT = `你是一个专业的前端代码�
 }
 \`\`\`
 
+## index.html 固定模板（必须严格遵守，不得修改结构）
+
+index.html 必须与以下内容完全一致，**只允许**将 \`<title>React App</title>\` 中的 "React App" 替换为项目名称（如 "贪吃蛇游戏"），其余一字不能改。禁止在 head 内添加 style、多余 meta 或任何额外标签；禁止改写属性写法（属性之间只能有空格，禁止使用冒号，例如必须写 \`name="viewport" content="..."\` 而非 \`name="viewport": content="..."\`）。
+
+\`\`\`html
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>
+\`\`\`
+
 ## 严格文件结构约束
 
 你生成的项目必须包含以下文件结构，不得遗漏任何文件：
@@ -200,6 +219,7 @@ export class AIService {
 - 生成的项目必须完整，包含所有必需的配置文件
 - 遵循 React 最佳实践
 - 所有的html标签内部不允许出现>>或者<<符号，否则会导致前端渲染错误
+- **index.html**：必须使用上述固定模板，仅可修改 \`<title>\` 内的文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta、禁止属性写法错误（如 \`name="viewport": content="..."\` 中的冒号会导致构建失败，正确写法为 \`name="viewport" content="..."\`）
 - 如果无法生成符合要求的代码，直接跳过
 - 切记：严格按照上述要求生成代码
 `;
@@ -242,6 +262,25 @@ export const CODE_GENERATION_SYSTEM_PROMPT_STREAM = `你是一个专业的前端
     "vite": "^6.2.0"
   }
 }
+\`\`\`
+
+## index.html 固定模板（必须严格遵守，不得修改结构）
+
+index.html 必须与以下内容完全一致，**只允许**将 \`<title>React App</title>\` 中的 "React App" 替换为项目名称（如 "贪吃蛇游戏"），其余一字不能改。禁止在 head 内添加 style、多余 meta 或任何额外标签；禁止改写属性写法（属性之间只能有空格，禁止使用冒号，例如必须写 \`name="viewport" content="..."\` 而非 \`name="viewport": content="..."\`）。
+
+\`\`\`html
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>
 \`\`\`
 
 ## 严格文件结构约束
@@ -395,6 +434,7 @@ export class AIService {
 - 生成的项目必须完整，包含所有必需的配置文件
 - 遵循 React 最佳实践
 - 所有的html标签内部不允许出现>>或者<<符号，否则会导致前端渲染错误
+- **index.html**：必须使用固定模板，仅可修改 \`<title>\` 内文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta、禁止属性写法错误（正确：\`name="viewport" content="..."\`，错误：\`name="viewport": content="..."\`）
 `;
 export const CODE_GENERATION_USER_PROMPT = (userInput, currentPage = null) => {
   let prompt = `请根据以下需求生成一个完整的 React + JavaScript 项目：
