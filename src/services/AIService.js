@@ -85,9 +85,11 @@ export class AIService {
   constructor(apiKeys = {}) {
     // 设置环境变量（Vercel AI SDK 会自动读取）
     if (apiKeys.anthropic) {
+      console.log('anthropic', apiKeys.anthropic);
       process.env.ANTHROPIC_API_KEY = apiKeys.anthropic;
     }
     if (apiKeys.google) {
+      console.log('google', apiKeys.google);
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKeys.google;
       process.env.GEMINI_API_KEY = apiKeys.google;
     }
