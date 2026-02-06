@@ -79,8 +79,9 @@ export default defineConfig({
         await fs.writeFile(path.join(sourceDir, 'index.html'), indexHtml);
     }
 
-    // 检查并添加 src/index.jsx（如果不存在）- 这是必需的入口文件
-    if (!fileList.some(f => f === 'src/index.jsx' || f.endsWith('/index.jsx'))) {
+    // 检查并添加 src/index.jsx（如果不存在）- 兼容键名 index.jsx
+    const hasIndexJsx = fileList.some(f => f === 'src/index.jsx' || f.endsWith('/index.jsx')) || fileList.includes('index.jsx');
+    if (!hasIndexJsx) {
         console.log('[CodeGenController] Adding default src/index.jsx');
         const indexJsx = `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -99,10 +100,18 @@ createRoot(root).render(
         const indexJsxPath = path.join(sourceDir, 'src', 'index.jsx');
         await fs.ensureDir(path.dirname(indexJsxPath));
         await fs.writeFile(indexJsxPath, indexJsx);
+    } else if (files['index.jsx'] && !files['src/index.jsx']) {
+        const indexJsxPath = path.join(sourceDir, 'src', 'index.jsx');
+        await fs.ensureDir(path.dirname(indexJsxPath));
+        await fs.writeFile(indexJsxPath, files['index.jsx'], 'utf-8');
+        files['src/index.jsx'] = files['index.jsx'];
+        delete files['index.jsx'];
     }
 
     // 检查并添加 src/App.jsx（如果不存在）- 这是必需的主组件
-    if (!fileList.some(f => f === 'src/App.jsx' || f.endsWith('/App.jsx'))) {
+    // 兼容 AI 返回的键名为 App.jsx 而非 src/App.jsx（如部分 Gemini 输出）
+    const hasAppJsx = fileList.some(f => f === 'src/App.jsx' || f.endsWith('/App.jsx')) || fileList.includes('App.jsx');
+    if (!hasAppJsx) {
         console.log('[CodeGenController] Adding default src/App.jsx');
         const appJsx = `import './App.css';
 
@@ -120,10 +129,18 @@ export default App;
         const appJsxPath = path.join(sourceDir, 'src', 'App.jsx');
         await fs.ensureDir(path.dirname(appJsxPath));
         await fs.writeFile(appJsxPath, appJsx);
+    } else if (files['App.jsx'] && !files['src/App.jsx']) {
+        // AI 返回了 App.jsx 但键名无 src/ 前缀，写入到 src/App.jsx 避免被占位覆盖
+        const appJsxPath = path.join(sourceDir, 'src', 'App.jsx');
+        await fs.ensureDir(path.dirname(appJsxPath));
+        await fs.writeFile(appJsxPath, files['App.jsx'], 'utf-8');
+        files['src/App.jsx'] = files['App.jsx'];
+        delete files['App.jsx'];
     }
 
-    // 检查并添加 App.css（如果不存在）- 这是必需的文件
-    if (!fileList.some(f => f === 'src/App.css' || f.endsWith('/App.css'))) {
+    // 检查并添加 App.css（如果不存在）- 兼容键名 App.css
+    const hasAppCss = fileList.some(f => f === 'src/App.css' || f.endsWith('/App.css')) || fileList.includes('App.css');
+    if (!hasAppCss) {
         console.log('[CodeGenController] Adding default App.css');
         const appCss = `/* App.css - 主应用样式 */
 * {
@@ -157,6 +174,12 @@ body {
         const appCssPath = path.join(sourceDir, 'src', 'App.css');
         await fs.ensureDir(path.dirname(appCssPath));
         await fs.writeFile(appCssPath, appCss);
+    } else if (files['App.css'] && !files['src/App.css']) {
+        const appCssPath = path.join(sourceDir, 'src', 'App.css');
+        await fs.ensureDir(path.dirname(appCssPath));
+        await fs.writeFile(appCssPath, files['App.css'], 'utf-8');
+        files['src/App.css'] = files['App.css'];
+        delete files['App.css'];
     }
 }
 

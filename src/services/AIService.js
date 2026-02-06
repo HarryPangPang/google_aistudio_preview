@@ -15,27 +15,33 @@ import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERA
  */
 const MODEL_CONFIG = {
   
-    // Google Gemini 模型 - 通过 prompt 引导思考过程
+  // Google Gemini 模型 - 思考模式必须通过 providerOptions.google.thinkingConfig 传入
   'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
-    maxTokens: 8192,
-    supportsThinking: true, // 通过 prompt 引导
-    thinkingConfig: {
-      includeThoughts: true,
-      defaultThinking: true, // 默认开启 thinking
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingLevel: 'high',
+          includeThoughts: true,
+        },
+      },
     },
+    thinkingConfig: { defaultThinking: true },
   },
 
   'gemini-3-pro-preview': {
     provider: 'google',
     model: google('gemini-3-pro-preview'),
-    maxTokens: 8192,
-    supportsThinking: true, // 通过 prompt 引导
-    thinkingConfig: {
-      includeThoughts: true,
-      defaultThinking: true, // 默认开启 thinking
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingLevel: 'high',
+          includeThoughts: true,
+        },
+      },
     },
+    thinkingConfig: { defaultThinking: true },
   },
 
 
@@ -43,8 +49,6 @@ const MODEL_CONFIG = {
   'claude-4.5': {
     provider: 'anthropic',
     model: anthropic('claude-sonnet-4-5-20250929'),
-    maxTokens: 8192,
-    supportsThinking: true, // Claude 原生支持 extended thinking
     thinkingConfig: {
       includeThoughts: true,
       defaultThinking: true, // 默认开启 thinking
@@ -58,14 +62,10 @@ const MODEL_CONFIG = {
   // 'gpt-4o': {
   //   provider: 'openai',
   //   model: openai('gpt-4o'),
-  //   maxTokens: 8192,
-  //   supportsThinking: false
   // },
   // 'gpt-4-turbo': {
   //   provider: 'openai',
   //   model: openai('gpt-4-turbo'),
-  //   maxTokens: 8192,
-  //   supportsThinking: false
   // }
 };
 
@@ -102,7 +102,7 @@ export class AIService {
       throw new Error(`Unknown model: ${modelId}. Supported models: ${Object.keys(MODEL_CONFIG).join(', ')}`);
     }
 
-    const { model, maxTokens } = config;
+    const { model } = config;
 
     console.log(`[AIService] Using model: ${modelId} (provider: ${config.provider})`);
 
@@ -111,24 +111,24 @@ export class AIService {
 
     if (stream) {
       // 流式响应
-      return this._generateStream(model, messages, maxTokens);
+      return this._generateStream(model, messages, config);
     } else {
       // 非流式响应
-      return this._generateText(model, messages, maxTokens);
+      return this._generateText(model, messages, config);
     }
   }
 
   /**
    * 非流式生成
    */
-  async _generateText(model, messages, maxTokens) {
+  async _generateText(model, messages, restConfig = {}) {
     try {
       const result = await generateText({
         model,
         system: CODE_GENERATION_SYSTEM_PROMPT,
         messages,
-        maxTokens,
-        temperature: 0.7
+        temperature: 0.8,
+        ...restConfig
       });
 
       console.log(`[AIService] Generated text, tokens used: ${result.usage?.totalTokens || 'unknown'}`);
@@ -163,20 +163,17 @@ export class AIService {
   /**
    * 流式生成
    */
-  async _generateStream(model, messages, maxTokens) {
+  async _generateStream(model, messages, restConfig = {}) {
     try {
-      // 构建请求配置
+      // 构建请求配置（providerOptions.google.thinkingConfig 会开启 Gemini 思考模式）
       const config = {
         model,
         system: CODE_GENERATION_SYSTEM_PROMPT_STREAM,
         messages,
-        maxTokens,
-        temperature: 0.7
+        temperature: 0.8,
+        ...restConfig
       };
-
-      // 如果模型支持 extended thinking，可以在这里添加额外配置
-      // 例如对于 Claude: config.thinking = { enabled: true, budget_tokens: 1000 }
-      // 注意：具体参数取决于 Vercel AI SDK 和模型提供商的支持
+      console.log('[AIService] Stream config :', config);
 
       const result = streamText(config);
 
@@ -245,8 +242,24 @@ export class AIService {
   }
 
   /**
+   * 规范化 files 键名，确保 src/ 下的文件被 ensureConfigFiles 正确识别
+   * 例如 Gemini 可能返回 "App.jsx" 而非 "src/App.jsx"
+   */
+  _normalizeFileKeys(files) {
+    const normalized = { ...files };
+    const srcOnly = ['App.jsx', 'App.css', 'index.jsx'];
+    for (const name of srcOnly) {
+      if (normalized[name] != null && normalized[`src/${name}`] == null) {
+        normalized[`src/${name}`] = normalized[name];
+        delete normalized[name];
+      }
+    }
+    return normalized;
+  }
+
+  /**
    * 解析 AI 响应，提取代码文件
-   * 支持多种格式：JSON、代码块、Markdown
+   * 支持多种格式：JSON、代码块、Markdown（含 Gemini 的 ```json 包裹）
    */
   _parseCodeResponse(content) {
     try {
@@ -254,14 +267,31 @@ export class AIService {
       console.log('[AIService] Parsing response, content length:', content.length);
       console.log('[AIService] First 500 chars:', content.substring(0, 500));
 
+      // 优先从 markdown 代码块中提取 JSON（Gemini 常把整段输出放在 ```json ... ``` 里）
+      let jsonContent = content;
+      const allCodeBlocks = content.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g);
+      for (const block of allCodeBlocks) {
+        const inner = block[1].trim();
+        if (inner.includes('"files"')) {
+          jsonContent = inner;
+          console.log('[AIService] Extracted JSON from code block');
+          break;
+        }
+      }
+
       // 方法 1: 尝试解析 JSON 格式
-      const jsonMatch = content.match(/\{[\s\S]*"files"[\s\S]*\}/);
+      const jsonMatch = jsonContent.match(/\{[\s\S]*"files"[\s\S]*\}/);
       if (jsonMatch) {
         console.log('[AIService] Found JSON format, attempting to parse...');
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.files && typeof parsed.files === 'object') {
-          console.log('[AIService] Successfully parsed JSON format with', Object.keys(parsed.files).length, 'files');
-          return parsed.files;
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.files && typeof parsed.files === 'object') {
+            const files = this._normalizeFileKeys(parsed.files);
+            console.log('[AIService] Successfully parsed JSON format with', Object.keys(files).length, 'files');
+            return files;
+          }
+        } catch (parseErr) {
+          console.warn('[AIService] JSON.parse failed, trying next method:', parseErr.message);
         }
       }
 
@@ -325,9 +355,10 @@ export class AIService {
         throw new Error('No code files found in AI response. Please try again with a more specific prompt.');
       }
 
-      console.log(`[AIService] Parsed ${Object.keys(files).length} files:`, Object.keys(files).join(', '));
+      const normalized = this._normalizeFileKeys(files);
+      console.log(`[AIService] Parsed ${Object.keys(normalized).length} files:`, Object.keys(normalized).join(', '));
 
-      return files;
+      return normalized;
     } catch (error) {
       console.error('[AIService] Failed to parse code response:', error);
       console.error('[AIService] Content preview:', content.substring(0, 2000));
@@ -343,7 +374,6 @@ export class AIService {
       id,
       provider: MODEL_CONFIG[id].provider,
       label: id,
-      maxTokens: MODEL_CONFIG[id].maxTokens
     }));
   }
 
@@ -354,12 +384,6 @@ export class AIService {
     return modelId in MODEL_CONFIG;
   }
 
-  /**
-   * 检查模型是否原生支持思考功能
-   */
-  static supportsThinking(modelId) {
-    return MODEL_CONFIG[modelId]?.supportsThinking || false;
-  }
 
   /**
    * 获取模型的思考配置
