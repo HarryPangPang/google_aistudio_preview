@@ -630,6 +630,8 @@ export const CodeGenController = {
                 for (const line of lines) {
                     const trimmedLine = line.trim();
                     if (!trimmedLine) continue;
+                    // 跳过 markdown 代码围栏行（模型有时会输出 ``` 或 ```json）
+                    if (trimmedLine === '```' || trimmedLine.startsWith('```')) continue;
 
                     try {
                         // 尝试解析 JSON 对象

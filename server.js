@@ -87,6 +87,8 @@ app.use(router.routes()).use(router.allowedMethods());
 
 app.use(PreviewController.serve);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
+server.timeout = 0;           // 所有接口不超时
+server.keepAliveTimeout = 65000;
