@@ -119,7 +119,7 @@ project/
 2. 导入 GoogleGenAI 类（不是 GoogleGenerativeAI）
 3. 使用 gemini-3-flash-preview 模型
 4. 正确的 API 调用方法
-5. 传入 apiKey 时保留 process.env.API_KEY
+5. 传入 apiKey 时保留 process.env.GEMINI_API_KEY
 
 示例代码片段：
 
@@ -130,7 +130,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 export class AIService {
   constructor(apiKey) {
     this.genAI = new GoogleGenAI({
-      apiKey: process.env.API_KEY || apiKey || ''
+      apiKey: process.env.GEMINI_API_KEY || apiKey || ''
     });
   }
 
@@ -157,7 +157,7 @@ export class AIService {
 **关键要点**：
 - 使用 \`this.genAI.models.generateContent()\` 方法
 - 传入 \`contents\` 参数（不是 content）
-- 确保 apiKey 正确传入，保留process.env.API_KEY
+- 确保 apiKey 正确传入，保留process.env.GEMINI_API_KEY
 - 使用指定模型 \`gemini-3-flash-preview\`
 - 使用可选链访问属性：response?.text
 - 提供默认值防止 undefined：response?.text ?? ''
