@@ -5,10 +5,15 @@
  */
 
 import { streamText, generateText } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERATION_SYSTEM_PROMPT_STREAM } from '../config/prompts.js';
+
+// 使用 /v1 路径，避免 ANTHROPIC_BASE_URL 被设为 https://api.anthropic.com 时请求发往 /messages 导致 404
+const anthropic = createAnthropic({
+  baseURL: 'https://api.anthropic.com/v1',
+});
 
 /**
  * AI 模型配置 - 使用 Vercel AI SDK 的统一模型标识
@@ -42,14 +47,22 @@ const MODEL_CONFIG = {
   },
 
 
-  // Claude 模型 - 支持 extended thinking
-  'claude-4.5': {
+  // Claude Sonnet 4.5（若报 Not Found 请用 claude-sonnet-4-20250514 或检查 API 账号可用模型 GET /v1/models）
+  'claude-opus-4-6': {
     provider: 'anthropic',
-    model: anthropic('claude-sonnet-4-5-20250929'),
+    model: anthropic('claude-opus-4-6'),
     providerOptions: {
       anthropic: {
         thinking: { type: 'enabled', budgetTokens: 12000 },
-      }
+      },
+    },
+  },
+  // 备用：Claude 3.5 Sonnet，兼容性更好
+  'claude-sonnet-4-20250514': {
+    provider: 'anthropic',
+    model: anthropic('claude-sonnet-4-20250514'),
+    providerOptions: {
+      anthropic: {},
     },
   },
 
@@ -85,7 +98,7 @@ export class AIService {
 
   /**
    * 生成代码项目
-   * @param {string} modelId - 模型 ID（如 'claude-4.5', 'gemini-3-pro'）
+   * @param {string} modelId - 模型 ID（如 'claude-opus-4-6', 'gemini-3-pro'）
    * @param {string} userPrompt - 用户输入的需求
    * @param {Array} history - 历史对话记录
    * @param {string} currentPage - 当前页面上下文
@@ -109,13 +122,21 @@ export class AIService {
       // 流式响应
       return this._generateStream(model, messages, config);
     } else {
+      return {
+        files: {},
+        thinking: '',
+        usage: {
+          totalTokens: 0
+        },
+        finishReason: 'stop'
+      };
       // 非流式响应
       return this._generateText(model, messages, config);
     }
   }
 
   /**
-   * 非流式生成
+   * 非流式生成 暂时不用但是保留
    */
   async _generateText(model, messages, restConfig = {}) {
     try {

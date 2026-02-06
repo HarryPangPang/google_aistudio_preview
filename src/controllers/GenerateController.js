@@ -9,8 +9,6 @@ import { TMP_DIR } from '../config/constants.js';
 // Assuming GoogleStudio service runs on port 1234
 const GOOGLE_STUDIO_URL = process.env.GOOGLE_STUDIO_URL || 'http://localhost:1234';
 
-// Claude API Key from environment
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
 
 export const GenerateController = {
     async generate(ctx) {
