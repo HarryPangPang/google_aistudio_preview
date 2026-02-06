@@ -16,10 +16,36 @@ import { TMP_DIR } from '../config/constants.js';
 
 // 初始化 AI Service（使用 Vercel AI SDK）
 const aiService = new AIService({
-    anthropic: process.env.ANTHROPIC_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
     google: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     openai: process.env.OPENAI_API_KEY
 });
+
+/**
+ * 为本次代码生成创建一条项目记录，便于在「我的项目」中展示
+ * 仅当未传入 projectId 且用户已登录时创建
+ */
+async function ensureProjectForCodegen({ sessionId, chatId, user, fileName, chatContent, files, modelId, prompt }) {
+  if (!user?.id) return;
+  try {
+    await ProjectModel.create({
+      id: sessionId,
+      user_id: user.id,
+      username: user?.username || user?.email || null,
+      type: 'codegen',
+      model_label: modelId,
+      model_value: modelId,
+      title: fileName || (typeof prompt === 'string' ? prompt.slice(0, 80) : 'AI 生成项目'),
+      prompt: typeof prompt === 'string' ? prompt : null,
+      chat_content: chatContent,
+      driveid: chatId,
+      status: 'draft',
+      files: typeof files === 'object' && !Array.isArray(files) ? JSON.stringify(Object.keys(files)) : (Array.isArray(files) ? JSON.stringify(files) : files),
+    });
+  } catch (err) {
+    if (err?.message && !err.message.includes('UNIQUE')) console.warn('[CodeGenController] ensureProjectForCodegen:', err.message);
+  }
+}
 
 /**
  * 确保必要的配置文件存在
@@ -336,15 +362,19 @@ export const CodeGenController = {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
-            // 如果有项目 ID，更新项目信息
+            // 如果有项目 ID，更新项目信息；否则为「我的项目」创建一条记录
             if (projectId) {
                 await ProjectModel.update(projectId, {
                     driveid: chatId,
                     files: JSON.stringify(Object.keys(files)),
                     chat_content: aiResponse
                 });
+            } else {
+                await ensureProjectForCodegen({
+                    sessionId, chatId, user,
+                    fileName, chatContent: aiResponse, files, modelId, prompt
+                });
             }
-
 
             // 返回响应
             ctx.body = {
@@ -546,6 +576,19 @@ export const CodeGenController = {
                 INSERT INTO build_record (file_name, target_path, is_processed, create_time, update_time, drive_id, id, user_id, username)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
+
+            if (projectId) {
+                await ProjectModel.update(projectId, {
+                    driveid: chatId,
+                    files: JSON.stringify(Object.keys(files)),
+                    chat_content: aiResponse
+                });
+            } else {
+                await ensureProjectForCodegen({
+                    sessionId, chatId, user,
+                    fileName, chatContent: aiResponse, files: Object.keys(files), modelId: useModelId, prompt
+                });
+            }
 
             ctx.body = {
                 success: true,
@@ -771,12 +814,17 @@ export const CodeGenController = {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, fileName, sourceDir, 0, Date.now(), Date.now(), chatId, sessionId, user?.id || null, user?.username || user?.email || null);
 
-            // 如果有项目 ID，更新项目信息
+            // 如果有项目 ID，更新项目信息；否则为「我的项目」创建一条记录
             if (projectId) {
                 await ProjectModel.update(projectId, {
                     driveid: chatId,
                     files: JSON.stringify(Object.keys(files)),
                     chat_content: aiResponse
+                });
+            } else {
+                await ensureProjectForCodegen({
+                    sessionId, chatId, user,
+                    fileName, chatContent: aiResponse, files, modelId, prompt
                 });
             }
 
