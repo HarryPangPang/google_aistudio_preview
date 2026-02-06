@@ -632,6 +632,8 @@ export const CodeGenController = {
                     if (!trimmedLine) continue;
                     // 跳过 markdown 代码围栏行（模型有时会输出 ``` 或 ```json）
                     if (trimmedLine === '```' || trimmedLine.startsWith('```')) continue;
+                    // 跳过明显不是完整 JSON 的行（流式输出可能拆成 }、, 等片段）
+                    if (!trimmedLine.startsWith('{')) continue;
 
                     try {
                         // 尝试解析 JSON 对象
