@@ -15,7 +15,6 @@ import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERA
  */
 const MODEL_CONFIG = {
   
-  // Google Gemini 模型 - 思考模式必须通过 providerOptions.google.thinkingConfig 传入
   'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
@@ -27,7 +26,6 @@ const MODEL_CONFIG = {
         },
       },
     },
-    thinkingConfig: { defaultThinking: true },
   },
 
   'gemini-3-pro-preview': {
@@ -41,7 +39,6 @@ const MODEL_CONFIG = {
         },
       },
     },
-    thinkingConfig: { defaultThinking: true },
   },
 
 
@@ -49,12 +46,11 @@ const MODEL_CONFIG = {
   'claude-4.5': {
     provider: 'anthropic',
     model: anthropic('claude-sonnet-4-5-20250929'),
-    thinkingConfig: {
-      includeThoughts: true,
-      defaultThinking: true, // 默认开启 thinking
-      // 如果 Anthropic API 支持，可以在这里配置 thinking 相关参数
-      // 目前通过 prompt 引导即可
-    }
+    providerOptions: {
+      anthropic: {
+        thinking: { type: 'enabled', budgetTokens: 12000 },
+      }
+    },
   },
 
 
@@ -165,7 +161,6 @@ export class AIService {
    */
   async _generateStream(model, messages, restConfig = {}) {
     try {
-      // 构建请求配置（providerOptions.google.thinkingConfig 会开启 Gemini 思考模式）
       const config = {
         model,
         system: CODE_GENERATION_SYSTEM_PROMPT_STREAM,
@@ -385,12 +380,7 @@ export class AIService {
   }
 
 
-  /**
-   * 获取模型的思考配置
-   */
-  static getThinkingConfig(modelId) {
-    return MODEL_CONFIG[modelId]?.thinkingConfig || {};
-  }
+
 }
 
 export default AIService;
