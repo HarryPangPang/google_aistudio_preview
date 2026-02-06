@@ -10,6 +10,17 @@ import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERATION_SYSTEM_PROMPT_STREAM } from '../config/prompts.js';
 
+/**
+ * 将 AI 可能输出的字面量 Unicode 转义（如 \u6d77\u7ef5\u5b9d\u5b9d）解码为真实字符，避免界面乱码。
+ * 支持 JSON 风格 \uXXXX（4 位十六进制）和 Python 风格 \UXXXXXXXX（8 位十六进制）。
+ */
+export function decodeUnicodeEscapes(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/\\U([0-9a-fA-F]{8})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
+}
+
 // 使用 /v1 路径，避免 ANTHROPIC_BASE_URL 被设为 https://api.anthropic.com 时请求发往 /messages 导致 404
 const anthropic = createAnthropic({
   baseURL: 'https://api.anthropic.com/v1',
@@ -272,6 +283,12 @@ export class AIService {
         delete normalized[name];
       }
     }
+    // 解码所有文件内容中的字面量 Unicode 转义，避免中文等显示为 \uXXXX 乱码
+    for (const key of Object.keys(normalized)) {
+      if (typeof normalized[key] === 'string') {
+        normalized[key] = decodeUnicodeEscapes(normalized[key]);
+      }
+    }
     return normalized;
   }
 
@@ -363,7 +380,7 @@ export class AIService {
           counter++;
         }
 
-        files[finalFileName] = codeContent;
+        files[finalFileName] = decodeUnicodeEscapes(codeContent);
       }
 
       console.log('[AIService] Found', Object.keys(files).length, 'code blocks');

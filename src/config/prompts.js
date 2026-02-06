@@ -186,6 +186,7 @@ export const CODE_GENERATION_PROMPT_OUTPUT_FORMAT = `
 
 ### 2. 代码输出
 你必须以 JSON 格式输出所有文件，格式如下：
+- **中文与特殊字符**：所有界面文案、标题、按钮文字等必须直接使用 UTF-8 中文字符（如「开始游戏」「最高分」），禁止使用 Unicode 转义（如 \\u5f00\\u59cb\\u6e38\\u620f），否则会导致界面乱码。
 
 \`\`\`json
 {

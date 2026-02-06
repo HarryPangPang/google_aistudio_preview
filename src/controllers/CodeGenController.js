@@ -5,7 +5,7 @@
  */
 
 import { getDb } from '../db/index.js';
-import { AIService } from '../services/AIService.js';
+import { AIService, decodeUnicodeEscapes } from '../services/AIService.js';
 import { MessageModel } from '../models/MessageModel.js';
 import { ProjectModel } from '../models/ProjectModel.js';
 import { BuildService } from '../services/BuildService.js';
@@ -648,11 +648,13 @@ export const CodeGenController = {
                             const codeMatch = parsed.content.match(/"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/);
                             if (codeMatch) {
                                 const fileName = codeMatch[1];
-                                const fileContent = codeMatch[2]
-                                    .replace(/\\n/g, '\n')
-                                    .replace(/\\t/g, '\t')
-                                    .replace(/\\"/g, '"')
-                                    .replace(/\\\\/g, '\\');
+                                const fileContent = decodeUnicodeEscapes(
+                                    codeMatch[2]
+                                      .replace(/\\n/g, '\n')
+                                      .replace(/\\t/g, '\t')
+                                      .replace(/\\"/g, '"')
+                                      .replace(/\\\\/g, '\\')
+                                  );
 
                                 files[fileName] = fileContent;
 
@@ -685,11 +687,13 @@ export const CodeGenController = {
                         const codeMatch = parsed.content.match(/"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/);
                         if (codeMatch) {
                             const fileName = codeMatch[1];
-                            const fileContent = codeMatch[2]
-                                .replace(/\\n/g, '\n')
-                                .replace(/\\t/g, '\t')
-                                .replace(/\\"/g, '"')
-                                .replace(/\\\\/g, '\\');
+                            const fileContent = decodeUnicodeEscapes(
+                                codeMatch[2]
+                                  .replace(/\\n/g, '\n')
+                                  .replace(/\\t/g, '\t')
+                                  .replace(/\\"/g, '"')
+                                  .replace(/\\\\/g, '\\')
+                            );
                             files[fileName] = fileContent;
                         }
                     }
