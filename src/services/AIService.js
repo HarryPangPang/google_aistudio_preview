@@ -208,6 +208,8 @@ export class AIService {
         system: CODE_GENERATION_SYSTEM_PROMPT_STREAM,
         messages,
         temperature: 0.8,
+        maxOutputTokens: 16384,
+        frequencyPenalty: 0.4,
         ...restConfig
       };
       console.log('[AIService] Stream config :', config);

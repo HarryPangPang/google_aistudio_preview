@@ -614,11 +614,21 @@ export const CodeGenController = {
             let fullContent = '';
             let buffer = ''; // 用于累积不完整的 JSON 对象
             const files = {}; // 存储解析出的文件
+            const REPEAT_WINDOW = 400;   // 检测最近多少字符内的重复
+            const REPEAT_THRESHOLD = 6;  // 同一短语出现次数超过此次数则判定为死循环
 
             // 流式发送文本，解析 JSON 格式的思考和代码
             for await (const chunk of streamResult.stream) {
                 fullContent += chunk;
                 buffer += chunk;
+
+                // 死循环检测：最近一段内容里若同一短句重复过多则提前结束流
+                const tail = fullContent.slice(-REPEAT_WINDOW);
+                const stopCount = (tail.match(/Stop\./g) || []).length;
+                if (stopCount >= REPEAT_THRESHOLD) {
+                    console.warn('[CodeGenController] Repetition loop detected (Stop. x' + stopCount + '), stopping stream early');
+                    break;
+                }
 
                 // 尝试从 buffer 中提取完整的 JSON 对象
                 const lines = buffer.split('\n');
