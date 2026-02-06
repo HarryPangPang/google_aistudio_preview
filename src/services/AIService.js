@@ -21,9 +21,10 @@ const MODEL_CONFIG = {
     model: google('gemini-3-flash-preview'),
     maxTokens: 8192,
     supportsThinking: true, // 通过 prompt 引导
-     thinkingConfig: {
-        includeThoughts: true,
-      },
+    thinkingConfig: {
+      includeThoughts: true,
+      defaultThinking: true, // 默认开启 thinking
+    },
   },
 
   'gemini-3-pro-preview': {
@@ -32,8 +33,9 @@ const MODEL_CONFIG = {
     maxTokens: 8192,
     supportsThinking: true, // 通过 prompt 引导
     thinkingConfig: {
-        includeThoughts: true,
-      },
+      includeThoughts: true,
+      defaultThinking: true, // 默认开启 thinking
+    },
   },
 
 
@@ -44,6 +46,8 @@ const MODEL_CONFIG = {
     maxTokens: 8192,
     supportsThinking: true, // Claude 原生支持 extended thinking
     thinkingConfig: {
+      includeThoughts: true,
+      defaultThinking: true, // 默认开启 thinking
       // 如果 Anthropic API 支持，可以在这里配置 thinking 相关参数
       // 目前通过 prompt 引导即可
     }
