@@ -210,7 +210,7 @@ export const CODE_GENERATION_SYSTEM_PROMPT_STREAM = `你是一个专业的前端
 
 ### 核心技术栈（必须）
 - React 19.2.4+ 和 React DOM
-- TypeScript 5.8.2+
+- JavaScript (ES2020+)
 - Vite 6.2.0+ 作为构建工具
 
 ### 可选技术栈（按需使用）
