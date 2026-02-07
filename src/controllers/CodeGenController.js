@@ -702,11 +702,14 @@ export const CodeGenController = {
 
                                 files[fileName] = fileContent;
 
-                                // 发送代码片段通知（前端不显示，但可以用于进度跟踪）
+                                // 发送代码片段通知，progress 为百分比（0-99，流式阶段不设 100）
+                                const fileCount = Object.keys(files).length;
+                                const ESTIMATED_FILES = 12;
+                                const progressPercent = Math.min(99, Math.round((fileCount / ESTIMATED_FILES) * 100));
                                 ctx.res.write(`data: ${JSON.stringify({
                                     type: 'code',
                                     fileName,
-                                    progress: Object.keys(files).length
+                                    progress: progressPercent
                                 })}\n\n`);
                                 if (ctx.res.flush) ctx.res.flush();
                             }
