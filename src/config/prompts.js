@@ -132,9 +132,9 @@ project/
    - **所有通过 npm 安装的包**（如 \`import ... from 'zustand'\`、\`from 'animejs'\`、\`from 'three'\`）**必须在 package.json 的 dependencies 中声明**，否则 Vite 构建会报 "Failed to resolve import"。尤其：使用 zustand 时 package.json 里必须有 \`"zustand": "^4.0.0"\`。
    - 宁可把逻辑写在同一个文件内，也不要写 \`import ... from './XXX'\` 却不生成 XXX 文件。生成前请自检：列出所有 import 的相对路径，确保每个都有对应生成文件。
 
-## 低级错误自检（输出前必须逐项检查，避免构建/解析报错）
+## 语法与符号错误自检（输出前必须逐项检查，避免所有语法/解析/运行时报错）
 
-以下错误会导致 "Expected a semicolon"、"Unexpected token"、解析失败等，**一律禁止**：
+以下错误会导致 "Expected a semicolon"、"Unexpected token"、"Assignment to constant variable"、解析失败或运行时报错，**一律禁止**：
 
 **1. 语句末尾多余或错误标点**
 - 禁止在字符串/模板字符串结束处多写 \`.\`、\`,\`、\`;\` 等。错误示例：\`let message = \`\${name}\`.\`（多了一个点）；正确：\`let message = \`\${name}\`;\`
@@ -144,24 +144,43 @@ project/
 **2. 成对符号必须匹配**
 - \`( )\` \`[ ]\` \`{ }\` \`\` \` \` \`" "\` \`' '\` 必须成对出现，不得漏写或多写
 - 模板字符串：\`\` 成对，中间内容正确；不要 \`\` 未闭合就换行，也不要闭合后多写 \`.\` 再换行
+- 字符串：双引号/单引号必须成对，内容中的引号需转义（\`"或 \\'\`）
 
 **3. HTML/JSX 与属性写法**
 - 禁止 \`name="viewport": content="..."\`（属性间用空格分隔，**禁止用冒号**）；正确 \`name="viewport" content="..."\`
 - 禁止在标签或文本中出现 \`>>\`、\`<<\`（会被解析成错误），用「大于」「小于」或其它表达
+- JSX：用 \`className\` 不用 \`class\`，用 \`htmlFor\` 不用 \`for\`；自闭合标签必须写 \`/>\`（如 \`<br />\`、\`<input />\`）；多个根节点必须包在单一父元素或 \`<></>\` Fragment 中；\`{}\` 内只能是表达式，不能写语句（如不能直接写 \`if (x) {}\`，要用三元或 \`&&\`）
 
-**4. const 与 let（禁止 "Assignment to constant variable"）**
+**4. const 与 let（禁止 "Assignment to constant variable" 与重复声明）**
 - \`const\` 声明的变量**不可重新赋值**，否则运行时报 \`TypeError: Assignment to constant variable\`
 - 若变量在声明后会被重新赋值（如循环累加、\`count = x\`、\`value += 1\` 等），**必须用 \`let\` 声明**
 - 仅当变量从声明后不再被重新赋值时，才使用 \`const\`
-- 错误示例：\`const count = 0; count += 1;\` 或 \`const x = 1; x = 2;\`；正确：\`let count = 0; count += 1;\` 或 \`const x = 1;\`（不再赋值的用 const）
+- \`const x;\` 非法（const 必须有初始值）；同一作用域内禁止 \`let/const\` 重复声明同一变量名
+- 错误示例：\`const count = 0; count += 1;\` 或 \`const x = 1; x = 2;\`；正确：\`let count = 0; count += 1;\`
 
-**5. 常见笔误**
-- 对象/数组字面量：最后一个元素后不要多逗号（除非刻意 trailing comma 风格一致）
-- 函数调用：\`fn(\` 必须有对应的 \`)\`，且括号内逗号分隔参数
-- 关键字与括号：\`if (\`、\`return (\` 等，括号成对
+**5. 对象与数组字面量**
+- 对象属性之间、数组元素之间**必须用逗号分隔**，不得漏写。错误：\`{ a: 1 b: 2 }\`、\`[1 2 3]\`；正确：\`{ a: 1, b: 2 }\`、\`[1, 2, 3]\`
+- 最后一个元素后的多余逗号可保留（trailing comma），但风格需一致；对象 key 与 value 之间用 \`:\`，属性之间用 \`,\`
 
-**6. 输出前自检动作**
-- 逐文件扫一遍：每行语句是否完整、有无多余 \`.\` \`,\`；所有引号/反引号/括号是否成对；index.html 属性是否无冒号、无 \`>>\` \`<<\`
+**6. 函数与关键字**
+- 函数调用 \`fn(\` 必须有对应的 \`)\`，括号内参数用逗号分隔；\`if/for/while/switch (\` 等括号成对
+- \`return\`、\`break\`、\`continue\` 只能出现在函数体或循环/switch 内；\`await\` 只能在 \`async\` 函数内使用
+- 禁止用保留字/关键字做变量名（如 \`const class = 1\`、\`let default = x\` 非法）；函数形参不得重复（\`function f(a, a)\` 非法）
+
+**7. 赋值与左值**
+- 赋值号左边必须是合法左值（变量、属性、数组成员等）。禁止 \`1 = 2\`、\`(a + b) = 3\`、\`fn() = 1\`
+- 禁止在 \`const\` 声明后对该变量再赋值（见第 4 条）
+
+**8. import 与 export**
+- \`export { x }\` 时 \`x\` 必须在本文件中有声明；每个模块最多一个 \`export default\`
+- \`import\` 的路径与名称需与目标模块实际导出一致，避免拼写错误
+
+**9. 常见笔误与 ASI**
+- 若某行以 \`[\` 或 \`(\` 开头，上一行末尾应有分号或确保不会被误解析（如 \`return\` 后直接 \`[1,2]\` 没问题，但 \`return\\n[1,2]\` 会变成 return; [1,2]）
+- 正则字面量 \`/.../\` 不要与除法混淆；注释 \`//\`、\`/* */\` 成对闭合
+
+**10. 输出前自检动作**
+- 逐文件检查：语句完整、无多余 \`.\` \`,\`；所有引号/反引号/括号成对；对象/数组元素间有逗号；const/let 使用正确；JSX 属性与根节点正确；index.html 属性无冒号、无 \`>>\` \`<<\`
 
 ## 生成前自检清单（输出前必须逐项确认）
 
@@ -170,8 +189,11 @@ project/
 - [ ] package.json 的 dependencies 包含所有在代码中 \`import ... from 'xxx'\` 的包（如用了 zustand 则必有 \`"zustand": "^4.0.0"\`）
 - [ ] 所有 \`import ... from './path'\` 的 path 在 files 中有对应文件
 - [ ] 无未使用的 import、变量、函数；界面文案用 UTF-8 中文，禁止 \\uXXXX 转义
-- [ ] **低级语法**：无多余 \`.\` \`,\`；括号 \`( ) [ ] { }\` 与引号、反引号成对；
-- [ ] **const/let**：会重新赋值的变量用 \`let\`，不重新赋值的用 \`const\`；禁止对 \`const\` 变量重新赋值（否则运行时报 "Assignment to constant variable"）
+- [ ] **语法与符号**：无多余 \`.\` \`,\`；\`( ) [ ] { }\` 与引号、反引号成对；对象/数组属性或元素之间均有逗号；字符串与模板字符串闭合正确
+- [ ] **const/let**：会重新赋值的变量用 \`let\`，不重新赋值的用 \`const\`；禁止对 \`const\` 变量重新赋值；同一作用域无重复声明；const 均有初始值
+- [ ] **JSX**：使用 className/htmlFor；自闭合标签写 \`/>\`；多根用单父或 Fragment；\`{}\` 内仅表达式；HTML/JSX 中无 \`>>\`、\`<<\`
+- [ ] **函数与关键字**：return/break/continue/await 位置正确；无保留字作变量名；形参无重复；赋值左侧为合法左值
+- [ ] **import/export**：export 与声明一致；每模块至多一个 default；import 路径与名称正确
 - [ ] HTML/JSX 中无 \`>>\`、\`<<\` 等错误符号
 
 ## AI 功能集成（一般不需要）
@@ -303,9 +325,9 @@ export const CODE_GENERATION_PROMPT_REMINDERS = `
 - **index.html**：必须使用上述固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内的文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（如 \`name="viewport": content="..."\` 中的冒号会导致构建失败，正确写法为 \`name="viewport" content="..."\`）
 - **禁止引用未生成文件**：所有 \`import ... from './X'\` 等相对路径必须在 \`files\` 中有对应文件，否则构建会报 "Could not resolve"
 - **状态库**：如需跨组件/全局状态，仅允许使用 zustand；使用 zustand 时**必须在 package.json 的 dependencies 中加入 \`"zustand": "^4.0.0"\`**，否则构建会报 "Failed to resolve import zustand"
-- **低级错误自检**：输出前检查——语句末尾无多余 \`.\` \`,\`；括号与引号、反引号成对；模板字符串成对；HTML 属性无冒号、无 \`>>\` \`<<\`；会重新赋值的变量用 \`let\`，禁止对 \`const\` 变量重新赋值（否则 "Assignment to constant variable"）
 - 如果无法生成符合要求的代码，直接跳过
 - 切记：严格按照上述要求生成代码
+- 输出前按「语法与符号错误自检」逐项检查
 - 输出前按「生成前自检清单」逐项确认
 `;
 
@@ -374,7 +396,7 @@ export const CODE_GENERATION_PROMPT_STREAM_REMINDERS = `
 - **index.html**：必须使用固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（正确：\`name="viewport" content="..."\`，错误：\`name="viewport": content="..."\`）
 - **禁止引用未生成文件**：所有相对路径 import 必须在本次输出的 files 中有对应文件，否则构建会报 "Could not resolve"
 - **状态库**：如需状态库仅允许 zustand；使用 zustand 时 package.json 的 dependencies 中必须包含 \`"zustand": "^4.0.0"\`，否则会报 "Failed to resolve import zustand"
-- **低级错误自检**：无多余 \`.\` \`,\`；括号与引号成对；模板字符串 \`\` 成对；HTML 无 \`>>\` \`<<\`、属性无冒号；会重新赋值的变量用 \`let\`，禁止对 \`const\` 变量重新赋值（否则 "Assignment to constant variable"）
+- 输出前按「语法与符号错误自检」逐项检查
 `;
 
 /** 流式完整 system prompt（兼容原有引用） */
