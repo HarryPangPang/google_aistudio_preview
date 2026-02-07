@@ -366,9 +366,13 @@ export default defineConfig({
 
         } catch (err) {
             console.error(`[BuildService] Error processing task ${task.id}:`, err);
-            // Mark as processed (failed) to avoid infinite loop
-            await db.run('UPDATE build_record SET is_processed = 1 WHERE id = ?', task.id);
-
+            // is_processed=3 表示构建失败，error_message 供前端展示
+            const errMsg = (err && err.message) ? String(err.message).slice(0, 2000) : String(err);
+            await db.run(
+                'UPDATE build_record SET is_processed = 3, error_message = ? WHERE id = ?',
+                errMsg,
+                task.id
+            );
         }
     }
 };

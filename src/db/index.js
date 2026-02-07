@@ -45,6 +45,7 @@ export const getDb = async () => {
             cover_url TEXT,
             drive_id TEXT,
             user_id INTEGER,
+            error_message TEXT,
             username TEXT
         );
 
@@ -126,6 +127,14 @@ export const getDb = async () => {
         CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
         CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     `);
+
+    // 迁移：build_record 增加 error_message（构建失败时写入，便于前端展示）
+    try {
+        await dbInstance.run('ALTER TABLE build_record ADD COLUMN error_message TEXT');
+    } catch (e) {
+        if (!e.message || !e.message.includes('duplicate column')) throw e;
+    }
+
     // keep this,Init tables
     // await dbInstance.exec(`
     //     CREATE TABLE IF NOT EXISTS deployments (

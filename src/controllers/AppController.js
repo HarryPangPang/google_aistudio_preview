@@ -48,6 +48,7 @@ export const AppController = {
                     b.is_processed,
                     b.cover_url,
                     b.drive_id,
+                    b.error_message,
                     p.user_id,
                     u.username
                 FROM build_record b

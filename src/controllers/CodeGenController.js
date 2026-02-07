@@ -578,6 +578,22 @@ export const CodeGenController = {
      * 新格式：解析 {"type":"think","content":"..."} 和 {"type":"code","content":"\"file.json\": \"...\""}
      */
     async _streamResponse(ctx, { chatId, sessionId, modelId, prompt, formattedHistory, currentPage, projectId, user }) {
+        const HEARTBEAT_INTERVAL_MS = 15000; // 防止代理/Nginx 读超时断开
+        let heartbeatId = null;
+
+        const sendError = (msg) => {
+            if (ctx.res.writableEnded) return;
+            try {
+                ctx.res.write(`data: ${JSON.stringify({ type: 'error', error: msg })}\n\n`);
+                if (ctx.res.flush) ctx.res.flush();
+            } catch (e) {
+                console.warn('[CodeGenController] sendError write failed:', e.message);
+            }
+            try {
+                if (!ctx.res.writableEnded) ctx.res.end();
+            } catch (e2) {}
+        };
+
         try {
             // 设置 SSE 响应头
             ctx.type = 'text/event-stream';
@@ -610,6 +626,20 @@ export const CodeGenController = {
             );
 
             console.log('[CodeGenController] Started streaming response');
+
+            // 心跳：定期发送注释行，防止代理读超时断开连接
+            heartbeatId = setInterval(() => {
+                if (ctx.res.writableEnded) {
+                    clearInterval(heartbeatId);
+                    return;
+                }
+                try {
+                    ctx.res.write(': heartbeat\n\n');
+                    if (ctx.res.flush) ctx.res.flush();
+                } catch (e) {
+                    clearInterval(heartbeatId);
+                }
+            }, HEARTBEAT_INTERVAL_MS);
 
             let fullContent = '';
             let buffer = ''; // 用于累积不完整的 JSON 对象
@@ -798,7 +828,12 @@ export const CodeGenController = {
                 });
             }
 
-            // 发送完成消息
+            // 发送完成消息（含 success，便于前端区分生成成功/无文件）
+            const fileCount = Object.keys(files).length;
+            if (heartbeatId) {
+                clearInterval(heartbeatId);
+                heartbeatId = null;
+            }
             ctx.res.write(`data: ${JSON.stringify({
                 type: 'complete',
                 data: {
@@ -809,7 +844,9 @@ export const CodeGenController = {
                     fileContents: files,
                     sourcePath: sourceDir,
                     usage: usageData,
-                    model: modelId
+                    model: modelId,
+                    success: fileCount > 0,
+                    warning: fileCount === 0 ? 'No files parsed from response' : undefined
                 }
             })}\n\n`);
 
@@ -818,9 +855,17 @@ export const CodeGenController = {
 
         } catch (error) {
             console.error('[CodeGenController] Stream error:', error);
-            ctx.res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
-            if (ctx.res.flush) ctx.res.flush();
-            ctx.res.end();
+            sendError(error.message || String(error));
+        } finally {
+            if (heartbeatId) {
+                clearInterval(heartbeatId);
+                heartbeatId = null;
+            }
+            if (!ctx.res.writableEnded) {
+                try {
+                    ctx.res.end();
+                } catch (e) {}
+            }
         }
     },
 
