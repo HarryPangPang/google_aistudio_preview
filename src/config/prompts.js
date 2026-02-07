@@ -18,7 +18,7 @@ export const CODE_GENERATION_PROMPT_COMMON = `你是一个专业的前端游戏�
 - **Tailwind CSS** - 通过 index.html 中的 CDN 引入，所有样式与布局优先使用 Tailwind 工具类（如 \`className="flex items-center gap-2"\`）。
 - **原生 CSS** - 仅可在 App.css 或组件内写原生 CSS（如复杂选择器、关键帧等）。**禁止使用**其它 CSS 框架（如 Bootstrap、Styled Components、Emotion 等），只允许 Tailwind + 原生 CSS。
 
-### 状态管理（如需跨组件/全局状态）
+### 状态管理（按需使用，如需跨组件/全局状态）
 - **仅允许使用 zustand**。禁止使用 Redux、MobX、Jotai、Recoil 等其它状态库。
 - 使用 zustand 时，**必须在 package.json 的 dependencies 中加入 \`"zustand": "^4.0.0"\`**，否则构建会报错 \`Failed to resolve import "zustand"\`。生成前自检：代码里若有 \`import ... from 'zustand'\`，则 package.json 里必须有 zustand 依赖。
 
