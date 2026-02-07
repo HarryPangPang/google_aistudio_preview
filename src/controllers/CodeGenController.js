@@ -21,6 +21,33 @@ const aiService = new AIService({
     openai: process.env.OPENAI_API_KEY
 });
 
+/** 仅对代码类文件扩展名做内容修复 */
+const CODE_EXTENSIONS = /\.(js|jsx|ts|tsx|mjs|cjs)$/;
+
+/**
+ * 修复生成代码中的常见语法笔误（如模板字符串末尾多余的点）
+ * 例如：`let message = \`${player.name} \`.;` → `let message = \`${player.name}\`;`
+ */
+function sanitizeGeneratedCode(content) {
+    if (typeof content !== 'string') return content;
+    return content
+        // 模板字符串结束反引号后多了一个点再跟分号：`.; → `;
+        .replace(/`\s*\.\s*;/g, '`;')
+        // 模板字符串结束反引号后多了一个点再换行：`.\n → `\n
+        .replace(/`\s*\.\s*(\r?\n)/g, '`$1');
+}
+
+/**
+ * 对 files 中代码文件内容做一次 sanitize，原地修改
+ */
+function sanitizeFiles(files) {
+    for (const [filePath, content] of Object.entries(files)) {
+        if (typeof content === 'string' && CODE_EXTENSIONS.test(filePath)) {
+            files[filePath] = sanitizeGeneratedCode(content);
+        }
+    }
+}
+
 /**
  * 确保必要的配置文件存在
  * 如果 AI 没有生成某些必需的配置文件，使用默认配置
@@ -279,6 +306,9 @@ export const CodeGenController = {
             console.log('[CodeGenController] AI generation result:', result);
 
             console.log(`[CodeGenController] Generated ${Object.keys(files).length} files`);
+
+            // 修复生成代码中的常见笔误（如模板字符串末尾多余的点）
+            sanitizeFiles(files);
 
             // 直接保存文件到 .tmp/source/{chatId} 目录（不压缩）
             const sourceDir = path.join(TMP_DIR, sessionId,'source');
@@ -762,6 +792,9 @@ export const CodeGenController = {
                     console.error('[CodeGenController] Fallback parser also failed:', error);
                 }
             }
+
+            // 修复生成代码中的常见笔误（如模板字符串末尾多余的点）
+            sanitizeFiles(files);
 
             // 直接保存文件到 .tmp/{sessionId}/source 目录（不压缩）
             const sourceDir = path.join(TMP_DIR, sessionId, 'source');
