@@ -310,25 +310,13 @@ export const CODE_GENERATION_PROMPT_OUTPUT_FORMAT = `
 \`\`\`
 `;
 
-/** 非流式：重要提醒 */
+/** 非流式：重要提醒（具体规则见上方公共部分，此处仅强调执行动作） */
 export const CODE_GENERATION_PROMPT_REMINDERS = `
 
-## 重要提醒（违反会导致构建或运行失败）
+## 重要提醒
 
-- 核心依赖（React、Vite）必须使用，其他依赖根据需求合理添加
-- 添加的依赖必须是稳定的、常用的库
-- 确保所有文件路径正确
-- 代码必须可以直接运行，无需修改
-- 生成的项目必须完整，包含所有必需的配置文件
-- 遵循 React 最佳实践
-- 所有的html标签内部不允许出现>>或者<<符号，否则会导致前端渲染错误
-- **index.html**：必须使用上述固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内的文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（如 \`name="viewport": content="..."\` 中的冒号会导致构建失败，正确写法为 \`name="viewport" content="..."\`）
-- **禁止引用未生成文件**：所有 \`import ... from './X'\` 等相对路径必须在 \`files\` 中有对应文件，否则构建会报 "Could not resolve"
-- **状态库**：如需跨组件/全局状态，仅允许使用 zustand；使用 zustand 时**必须在 package.json 的 dependencies 中加入 \`"zustand": "^4.0.0"\`**，否则构建会报 "Failed to resolve import zustand"
-- 如果无法生成符合要求的代码，直接跳过
-- 切记：严格按照上述要求生成代码
-- 输出前按「语法与符号错误自检」逐项检查
-- 输出前按「生成前自检清单」逐项确认
+- 输出前必须按「语法与符号错误自检」所有内容逐项检查，并按「生成前自检清单」逐项确认（技术栈、index.html、依赖与引用、const/let、JSX 等均已在上述公共部分说明）。
+- 若无法生成符合要求的代码，直接跳过；否则严格按上述全部要求生成。
 `;
 
 /** 非流式完整 system prompt（兼容原有引用） */
@@ -379,24 +367,13 @@ export const CODE_GENERATION_PROMPT_STREAM_FORMAT = `
 \`\`\`
 `;
 
-/** 流式：重要提醒 */
+/** 流式：重要提醒（技术栈、index.html、依赖与引用等见上方公共部分，此处仅强调流式格式与执行动作） */
 export const CODE_GENERATION_PROMPT_STREAM_REMINDERS = `
 
 ## 重要提醒
-- 严格按照上述流式格式输出
-- 每个 JSON 对象必须独立成行
-- 先输出所有思考过程，再输出所有代码文件
-- 核心依赖（React、Vite）必须使用，其他依赖根据需求合理添加
-- 添加的依赖必须是稳定的、常用的库
-- 确保所有文件路径正确
-- 代码必须可以直接运行，无需修改
-- 生成的项目必须完整，包含所有必需的配置文件
-- 遵循 React 最佳实践
-- 所有的html标签内部不允许出现>>或者<<符号，否则会导致前端渲染错误
-- **index.html**：必须使用固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（正确：\`name="viewport" content="..."\`，错误：\`name="viewport": content="..."\`）
-- **禁止引用未生成文件**：所有相对路径 import 必须在本次输出的 files 中有对应文件，否则构建会报 "Could not resolve"
-- **状态库**：如需状态库仅允许 zustand；使用 zustand 时 package.json 的 dependencies 中必须包含 \`"zustand": "^4.0.0"\`，否则会报 "Failed to resolve import zustand"
-- 输出前按「语法与符号错误自检」逐项检查
+
+- **流式格式**：严格按上述流式格式输出；每行一个完整 JSON；先输出思考再输出代码文件。
+- **输出前**：按「语法与符号错误自检」所有内容逐项检查，并按「生成前自检清单」逐项确认（其他要求均已在公共部分说明）。
 `;
 
 /** 流式完整 system prompt（兼容原有引用） */
