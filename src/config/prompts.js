@@ -149,12 +149,18 @@ project/
 - 禁止 \`name="viewport": content="..."\`（属性间用空格分隔，**禁止用冒号**）；正确 \`name="viewport" content="..."\`
 - 禁止在标签或文本中出现 \`>>\`、\`<<\`（会被解析成错误），用「大于」「小于」或其它表达
 
-**4. 常见笔误**
+**4. const 与 let（禁止 "Assignment to constant variable"）**
+- \`const\` 声明的变量**不可重新赋值**，否则运行时报 \`TypeError: Assignment to constant variable\`
+- 若变量在声明后会被重新赋值（如循环累加、\`count = x\`、\`value += 1\` 等），**必须用 \`let\` 声明**
+- 仅当变量从声明后不再被重新赋值时，才使用 \`const\`
+- 错误示例：\`const count = 0; count += 1;\` 或 \`const x = 1; x = 2;\`；正确：\`let count = 0; count += 1;\` 或 \`const x = 1;\`（不再赋值的用 const）
+
+**5. 常见笔误**
 - 对象/数组字面量：最后一个元素后不要多逗号（除非刻意 trailing comma 风格一致）
 - 函数调用：\`fn(\` 必须有对应的 \`)\`，且括号内逗号分隔参数
 - 关键字与括号：\`if (\`、\`return (\` 等，括号成对
 
-**5. 输出前自检动作**
+**6. 输出前自检动作**
 - 逐文件扫一遍：每行语句是否完整、有无多余 \`.\` \`,\`；所有引号/反引号/括号是否成对；index.html 属性是否无冒号、无 \`>>\` \`<<\`
 
 ## 生成前自检清单（输出前必须逐项确认）
@@ -164,7 +170,8 @@ project/
 - [ ] package.json 的 dependencies 包含所有在代码中 \`import ... from 'xxx'\` 的包（如用了 zustand 则必有 \`"zustand": "^4.0.0"\`）
 - [ ] 所有 \`import ... from './path'\` 的 path 在 files 中有对应文件
 - [ ] 无未使用的 import、变量、函数；界面文案用 UTF-8 中文，禁止 \\uXXXX 转义
-- [ ] **低级语法**：无多余 \`.\` \`,\`；括号 \`( ) [ ] { }\` 与引号、反引号成对；模板字符串末尾无多余符号；HTML 无 \`>>\` \`<<\`、属性无冒号
+- [ ] **低级语法**：无多余 \`.\` \`,\`；括号 \`( ) [ ] { }\` 与引号、反引号成对；
+- [ ] **const/let**：会重新赋值的变量用 \`let\`，不重新赋值的用 \`const\`；禁止对 \`const\` 变量重新赋值（否则运行时报 "Assignment to constant variable"）
 - [ ] HTML/JSX 中无 \`>>\`、\`<<\` 等错误符号
 
 ## AI 功能集成（一般不需要）
@@ -296,7 +303,7 @@ export const CODE_GENERATION_PROMPT_REMINDERS = `
 - **index.html**：必须使用上述固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内的文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（如 \`name="viewport": content="..."\` 中的冒号会导致构建失败，正确写法为 \`name="viewport" content="..."\`）
 - **禁止引用未生成文件**：所有 \`import ... from './X'\` 等相对路径必须在 \`files\` 中有对应文件，否则构建会报 "Could not resolve"
 - **状态库**：如需跨组件/全局状态，仅允许使用 zustand；使用 zustand 时**必须在 package.json 的 dependencies 中加入 \`"zustand": "^4.0.0"\`**，否则构建会报 "Failed to resolve import zustand"
-- **低级错误自检**：输出前检查——语句末尾无多余 \`.\` \`,\`；括号与引号、反引号成对；模板字符串成对；HTML 属性无冒号、无 \`>>\` \`<<\`
+- **低级错误自检**：输出前检查——语句末尾无多余 \`.\` \`,\`；括号与引号、反引号成对；模板字符串成对；HTML 属性无冒号、无 \`>>\` \`<<\`；会重新赋值的变量用 \`let\`，禁止对 \`const\` 变量重新赋值（否则 "Assignment to constant variable"）
 - 如果无法生成符合要求的代码，直接跳过
 - 切记：严格按照上述要求生成代码
 - 输出前按「生成前自检清单」逐项确认
@@ -354,7 +361,6 @@ export const CODE_GENERATION_PROMPT_STREAM_FORMAT = `
 export const CODE_GENERATION_PROMPT_STREAM_REMINDERS = `
 
 ## 重要提醒
-
 - 严格按照上述流式格式输出
 - 每个 JSON 对象必须独立成行
 - 先输出所有思考过程，再输出所有代码文件
@@ -368,7 +374,7 @@ export const CODE_GENERATION_PROMPT_STREAM_REMINDERS = `
 - **index.html**：必须使用固定模板（含 Tailwind CDN），仅可修改 \`<title>\` 内文字，禁止改 head/body 结构、禁止在 head 内加 style 或多余 meta（Tailwind 的 \`<script src="https://cdn.tailwindcss.com"></script>\` 必须保留）、禁止属性写法错误（正确：\`name="viewport" content="..."\`，错误：\`name="viewport": content="..."\`）
 - **禁止引用未生成文件**：所有相对路径 import 必须在本次输出的 files 中有对应文件，否则构建会报 "Could not resolve"
 - **状态库**：如需状态库仅允许 zustand；使用 zustand 时 package.json 的 dependencies 中必须包含 \`"zustand": "^4.0.0"\`，否则会报 "Failed to resolve import zustand"
-- **低级错误自检**：无多余 \`.\` \`,\`；括号与引号成对；模板字符串 \`\` 成对；HTML 无 \`>>\` \`<<\`、属性无冒号
+- **低级错误自检**：无多余 \`.\` \`,\`；括号与引号成对；模板字符串 \`\` 成对；HTML 无 \`>>\` \`<<\`、属性无冒号；会重新赋值的变量用 \`let\`，禁止对 \`const\` 变量重新赋值（否则 "Assignment to constant variable"）
 `;
 
 /** 流式完整 system prompt（兼容原有引用） */
