@@ -9,7 +9,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERATION_SYSTEM_PROMPT_STREAM } from '../config/prompts.js';
-
+import { codexCli } from 'ai-sdk-provider-codex-cli';
 /**
  * 将 AI 可能输出的字面量 Unicode 转义（如 \u6d77\u7ef5\u5b9d\u5b9d）解码为真实字符，避免界面乱码。
  * 支持 JSON 风格 \uXXXX（4 位十六进制）和 Python 风格 \UXXXXXXXX（8 位十六进制）。
@@ -84,17 +84,42 @@ const MODEL_CONFIG = {
       anthropic: {},
     },
   },
-
+  'gpt-5.2-codex': {
+      provider: 'openai',
+      model:codexCli('gpt-5.2-codex', {
+      allowNpx: true,
+      skipGitRepoCheck: true,
+      approvalMode: 'on-failure',
+      sandboxMode: 'workspace-write',
+    })
+    },
+  
+  'gpt-5.1-codex': {
+    provider: 'openai',
+    model: codexCli('gpt-5.1-codex', { allowNpx: true, skipGitRepoCheck: true }),
+  },
 
   // OpenAI 模型 - 通过 prompt 引导思考过程
-  // 'gpt-4o': {
-  //   provider: 'openai',
-  //   model: openai('gpt-4o'),
-  // },
-  // 'gpt-4-turbo': {
-  //   provider: 'openai',
-  //   model: openai('gpt-4-turbo'),
-  // }
+  'gpt-5.2 pro': {
+    provider: 'openai',
+    model: openai('gpt-5.2-pro'),
+    providerOptions:{
+      openai: {
+
+      },
+    }
+  },
+  
+  'gpt-5': {
+    provider: 'openai',
+    model: openai('gpt-5'),
+        providerOptions:{
+      openai: {
+        reasoningSummary: 'detailed', 
+      },
+    }
+  },
+
 };
 
 /**
@@ -207,7 +232,7 @@ export class AIService {
         model,
         system: CODE_GENERATION_SYSTEM_PROMPT_STREAM,
         messages,
-        temperature: 0.8,
+        temperature: 0.9,
         ...restConfig
       };
       console.log('[AIService] Stream config :', config);
