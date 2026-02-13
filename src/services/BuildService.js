@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
 import AdmZip from 'adm-zip';
-import { TMP_DIR, PROJECT_ROOT, PORT } from '../config/constants.js';
+import { TMP_DIR } from '../config/constants.js';
 import { getDb } from '../db/index.js';
 import { createEnvFile } from '../script/creaEnv.js';
 import { ScreenshotService } from './ScreenshotService.js';
@@ -66,7 +66,6 @@ export const BuildService = {
         const deployDir = path.join(TMP_DIR, deployId);
         const sourceDir = path.join(deployDir, 'source');
         const distDir = path.join(deployDir, 'dist');
-        const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
 
         try {
             // await DeploymentModel.updateStatus(deployId, 'building');
@@ -81,8 +80,7 @@ export const BuildService = {
             await DependencyCacheService.prepareDependencies(sourceDir, this.getDefaultPackageJson());
 
             // 3. Build only (dependencies already prepared)
-            const pnpmCmd = fs.existsSync(pnpmPath) ? `"${pnpmPath}"` : 'pnpm';
-            const cmd = `${pnpmCmd} run build`;
+            const cmd = 'pnpm run build';
 
             await new Promise((resolve, reject) => {
                 exec(cmd, { cwd: sourceDir, timeout: 300000 }, (error, stdout, stderr) => {
@@ -276,12 +274,9 @@ export default defineConfig({
                     console.warn(`[BuildService] Failed to delete temp zip, continuing anyway: ${err.message}`);
                 }
             }
-            // Run Build
-            const pnpmPath = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'pnpm');
-            // Ensure pnpm exists, otherwise use global pnpm or npm
-            const pnpmCmd = fs.existsSync(pnpmPath) ? `"${pnpmPath}"` : 'pnpm';
-            
-            // const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
+            // Run Build (using global pnpm)
+
+            // const cmd = 'pnpm install && pnpm run build';
 
 
             console.log(`[BuildService] Preparing dependencies for ${id}...`);
@@ -299,7 +294,7 @@ export default defineConfig({
             // await DependencyCacheService.prepareDependencies(sourceDir, packageJson);
 
             // Build only (dependencies already prepared)
-            const cmd = `${pnpmCmd} install && ${pnpmCmd} run build`;
+            const cmd = `pnpm install && pnpm run build`;
 
             console.log(`[BuildService] Executing build for ${id}...`);
             await new Promise((resolve, reject) => {
