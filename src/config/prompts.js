@@ -45,7 +45,7 @@ export const CODE_GENERATION_PROMPT_COMMON = `你是一个专业的前端游戏�
     "react-dom": "^18.3.1"
     // 根据需求添加其他依赖，如：
     // "zustand": "^4.0.0" - 如需要跨组件/全局状态（仅允许此状态库，使用则必须在此声明）
-    // "animejs": "^4.0.0" - 如需要复杂动画
+    // "animejs": "^3.2.2" - 如需要复杂动画
     // "three": "^0.160.0" - 如需要 3D 功能
     // "@google/genai": "^1.39.0" - 如需要 AI 功能
   },
@@ -248,7 +248,7 @@ export class AIService {
 
 ## 样式要求
 
-1. **样式仅限**：Tailwind CSS + 原生 CSS，禁止其它 CSS 框架；复杂动画可使用 Anime.js（\`npm i animejs\`）。
+1. **样式仅限**：Tailwind CSS + 原生 CSS，禁止其它 CSS 框架；复杂动画可使用 Anime.js（\`npm i animejs@3\`）。
 2. **现代化设计**：使用渐变、阴影、圆角等现代设计元素
 3. **色彩搭配**：使用和谐的配色方案
 4. **动画效果**：可使用 CSS 动画/过渡，或 Anime.js 做时间线、缓动、SVG 等
