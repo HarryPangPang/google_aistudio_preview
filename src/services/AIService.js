@@ -34,7 +34,11 @@ const anthropic = createAnthropic({
  * AI 模型配置 - 使用 Vercel AI SDK 的统一模型标识
  */
 const MODEL_CONFIG = {
-  
+    // AI 生成网站：使用 @google/genai（Gemini API）生成整站代码
+  [GENAI_WEBSITE_MODEL_ID]: {
+    provider: 'google-genai',
+    model: null, // 由 _generateWebsiteWithGenAI 直接调用 Google GenAI
+  },
   'gemini-3-flash-preview': {
     provider: 'google',
     model: google('gemini-3-flash-preview'),
@@ -124,11 +128,7 @@ const MODEL_CONFIG = {
     }
   },
 
-  // AI 生成网站：使用 @google/genai（Gemini API）生成整站代码
-  [GENAI_WEBSITE_MODEL_ID]: {
-    provider: 'google-genai',
-    model: null, // 由 _generateWebsiteWithGenAI 直接调用 Google GenAI
-  },
+
 
 };
 
@@ -201,7 +201,7 @@ export class AIService {
 
     console.log('[AIService] GenAI website: calling Gemini API stream (gemini-3-pro-preview)');
     const response = await ai.models.generateContentStream({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents,
       config: {
         temperature: 0.8,
