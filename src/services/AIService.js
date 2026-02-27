@@ -8,8 +8,12 @@ import { streamText, generateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
+import { GoogleGenAI } from '@google/genai';
 import { CODE_GENERATION_SYSTEM_PROMPT, CODE_GENERATION_USER_PROMPT, CODE_GENERATION_SYSTEM_PROMPT_STREAM } from '../config/prompts.js';
 import { codexCli } from 'ai-sdk-provider-codex-cli';
+
+/** 使用 @google/genai 的「AI 生成网站」模型 ID */
+export const GENAI_WEBSITE_MODEL_ID = 'gemini-genai-website';
 /**
  * 将 AI 可能输出的字面量 Unicode 转义（如 \u6d77\u7ef5\u5b9d\u5b9d）解码为真实字符，避免界面乱码。
  * 支持 JSON 风格 \uXXXX（4 位十六进制）和 Python 风格 \UXXXXXXXX（8 位十六进制）。
@@ -115,9 +119,15 @@ const MODEL_CONFIG = {
     model: openai('gpt-5'),
         providerOptions:{
       openai: {
-        reasoningSummary: 'detailed', 
+        reasoningSummary: 'detailed',
       },
     }
+  },
+
+  // AI 生成网站：使用 @google/genai（Gemini API）生成整站代码
+  [GENAI_WEBSITE_MODEL_ID]: {
+    provider: 'google-genai',
+    model: null, // 由 _generateWebsiteWithGenAI 直接调用 Google GenAI
   },
 
 };
@@ -157,28 +167,100 @@ export class AIService {
       throw new Error(`Unknown model: ${modelId}. Supported models: ${Object.keys(MODEL_CONFIG).join(', ')}`);
     }
 
-    const { model } = config;
+    // AI 生成网站：使用 @google/genai（Gemini API），仅支持流式
+    if (modelId === GENAI_WEBSITE_MODEL_ID) {
+      if (!stream) {
+        throw new Error('gemini-genai-website 仅支持流式输出，请使用 stream: true');
+      }
+      return this._generateWebsiteWithGenAI(userPrompt, history, currentPage);
+    }
 
+    const { model } = config;
     console.log(`[AIService] Using model: ${modelId} (provider: ${config.provider})`);
 
-    // 构建消息历史
     const messages = this._buildMessages(history, userPrompt, currentPage);
 
     if (stream) {
-      // 流式响应
       return this._generateStream(model, messages, config);
-    } else {
-      return {
-        files: {},
-        thinking: '',
-        usage: {
-          totalTokens: 0
-        },
-        finishReason: 'stop'
-      };
-      // 非流式响应
-      return this._generateText(model, messages, config);
     }
+    return this._generateText(model, messages, config);
+  }
+
+  /**
+   * 使用 @google/genai（Gemini API）流式生成网站代码，仅支持 stream
+   */
+  async _generateWebsiteWithGenAI(userPrompt, history, currentPage) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key is required for AI 生成网站. Set GEMINI_API_KEY or pass google key in apiKeys.');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const userContent = CODE_GENERATION_USER_PROMPT(userPrompt, currentPage);
+    const contents = `${CODE_GENERATION_SYSTEM_PROMPT_STREAM}\n\n---\n\n${userContent}`;
+
+    console.log('[AIService] GenAI website: calling Gemini API stream (gemini-3-pro-preview)');
+    const response = await ai.models.generateContentStream({
+      model: 'gemini-3-pro-preview',
+      contents,
+      config: {
+        temperature: 0.8,
+        topP: 0.95,
+        thinkingConfig: {
+          thinkingLevel: 'high',
+          includeThoughts: true,
+        },
+      },
+    });
+
+    const self = this;
+    const collected = [];
+    let resolveFullText;
+    const fullTextPromise = new Promise((r) => { resolveFullText = r; });
+
+    const textStream = (async function* () {
+      try {
+        for await (const chunk of response) {
+          const t = chunk?.text ?? '';
+          if (t) {
+            collected.push(t);
+            yield t;
+          }
+        }
+      } finally {
+        resolveFullText(collected.join(''));
+      }
+    })();
+
+    return {
+      stream: textStream,
+      fullText: fullTextPromise,
+      usage: fullTextPromise.then(() => ({ totalTokens: 0 })),
+      toKoaResponse(ctx) {
+        ctx.type = 'text/event-stream';
+        ctx.set({ 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+        (async () => {
+          let fullContent = '';
+          try {
+            for await (const chunk of textStream) {
+              fullContent += chunk;
+              ctx.res.write(`data: ${JSON.stringify({ type: 'text', content: chunk })}\n\n`);
+            }
+            const files = self._parseCodeResponse(fullContent);
+            const usage = { totalTokens: 0 };
+            ctx.res.write(`data: ${JSON.stringify({ type: 'complete', files: Object.keys(files), usage })}\n\n`);
+            ctx.res.end();
+          } catch (err) {
+            console.error('[AIService] GenAI stream error:', err);
+            ctx.res.end();
+          }
+        })();
+        return fullTextPromise.then((fullContent) => {
+          const files = self._parseCodeResponse(fullContent);
+          return { files, fullContent, usage: { totalTokens: 0 } };
+        });
+      },
+    };
   }
 
   /**
@@ -326,14 +408,63 @@ export class AIService {
   }
 
   /**
+   * 解析 GenAI 逐行 JSON 格式：{"type":"think","content":"..."} 与 {"type":"code","content":"\"path\": \"...\""}
+   * 用于 gemini-genai-website 等返回行式 JSON 的情况
+   */
+  _parseGenaiLineFormat(content) {
+    const files = {};
+    const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      let obj;
+      try {
+        obj = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (obj?.type !== 'code' || typeof obj.content !== 'string') continue;
+      const raw = obj.content.trim();
+      let chunk;
+      if (raw.startsWith('{')) {
+        try {
+          chunk = JSON.parse(raw);
+        } catch {
+          chunk = null;
+        }
+      } else {
+        try {
+          chunk = JSON.parse(`{${raw}}`);
+        } catch {
+          chunk = null;
+        }
+      }
+      if (chunk && typeof chunk === 'object' && !Array.isArray(chunk)) {
+        for (const [filePath, fileContent] of Object.entries(chunk)) {
+          if (typeof fileContent === 'string' && filePath) {
+            files[filePath] = decodeUnicodeEscapes(fileContent);
+          }
+        }
+      }
+    }
+    return Object.keys(files).length ? files : null;
+  }
+
+  /**
    * 解析 AI 响应，提取代码文件
-   * 支持多种格式：JSON、代码块、Markdown（含 Gemini 的 ```json 包裹）
+   * 支持多种格式：GenAI 行式 JSON、带 files 的 JSON、代码块、Markdown（含 Gemini 的 ```json 包裹）
    */
   _parseCodeResponse(content) {
     try {
       // 添加调试日志
       console.log('[AIService] Parsing response, content length:', content.length);
       console.log('[AIService] First 500 chars:', content.substring(0, 500));
+
+      // 方法 0: GenAI 逐行 JSON（{"type":"code","content":"\"path\": \"...\""}）
+      const genaiFiles = this._parseGenaiLineFormat(content);
+      if (genaiFiles && Object.keys(genaiFiles).length > 0) {
+        const normalized = this._normalizeFileKeys(genaiFiles);
+        console.log('[AIService] Parsed GenAI line format:', Object.keys(normalized).length, 'files');
+        return normalized;
+      }
 
       // 优先从 markdown 代码块中提取 JSON（Gemini 常把整段输出放在 ```json ... ``` 里）
       let jsonContent = content;
